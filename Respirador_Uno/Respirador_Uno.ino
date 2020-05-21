@@ -47,6 +47,8 @@ int Inicio;
 
 int avance = 0;
 
+volatile unsigned long ultimaInterrupcion = 0;     // variable static con ultimo valor de tiempo de interrupcion
+
 //***********************************************************************************************************************+
 // Seteos de valores de la relacion y configuracion del sistema. Al variarlos aqui variaran uniformamente en la logica
 //***********************************************************************************************************************
@@ -222,11 +224,11 @@ void getConfiguredValues()
   Wire.requestFrom(2, 17);
 
   byte values[17];
-  int i = 0;
+  int i = 17;
   while (Wire.available())
   {
     values[i] = Wire.read();
-    i++;
+    i--;
   }
 
   // Velocidad de Inspiracion
@@ -277,7 +279,6 @@ void getConfiguredValues()
 
 void encoder()
 {
-  static unsigned long ultimaInterrupcion = 0;     // variable static con ultimo valor de tiempo de interrupcion
   unsigned long tiempoInterrupcion = millis();     // variable almacena valor de func. millis
   if (tiempoInterrupcion - ultimaInterrupcion > 5) // rutina antirebote desestima pulsos menores a 5 mseg.
   {

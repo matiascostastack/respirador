@@ -397,6 +397,7 @@ void loop()
   // Calculo de la velocidad de Inspiración y Expiración para el movimiento hacia adelante y hacia atrás de las paletas
   Velo_Inspiracion = Tinspiracion; //Paso el valor la cuenta la realizo en el otro arduino (UNO)
   Velo_Expiracion = Texpiracion;   // Paso el valor, la cuenta la realizo en el otro arduino (UNO)
+
 }
 
 //****************************************************************************************************************
@@ -495,7 +496,7 @@ void requestEvent()
   Wire.write(byte16);
   Wire.write(byte17);
   Wire.write(byte18);
-  
+
   //Finaliza la transmision
   Prueba = 0;
   Prueba_2 = 0;

@@ -1,0 +1,4 @@
+{
+    "board": "arduino:avr:uno",
+    "sketch": "Respirador_Mega/Respirador_Mega.ino"
+}
