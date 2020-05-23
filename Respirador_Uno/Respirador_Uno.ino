@@ -47,8 +47,6 @@ int Inicio;
 
 int avance = 0;
 
-volatile unsigned long ultimaInterrupcion = 0;     // variable static con ultimo valor de tiempo de interrupcion
-
 //***********************************************************************************************************************+
 // Seteos de valores de la relacion y configuracion del sistema. Al variarlos aqui variaran uniformamente en la logica
 //***********************************************************************************************************************
@@ -62,6 +60,20 @@ float Velo_Motor_Insp = 0.0;
 float Velo_Motor_Exp = 0.0;
 float Angulo_Pulso = 0.0;
 
+double Vout = 0.0;
+double Vs = 5.0;
+double PcmH2o = 0.0;
+double Aux = 0.0;
+int p = 0;
+double Vout2 = 0.0;
+double PcmH2o_Grafica = 0.0;
+double Aux2 = 0.0;
+int g = 0;
+
+double Presion_PIP = 0.0;
+double Presion_Plateau = 0.0;
+double Presion_PEEP = 0.0;
+
 void setup()
 {
   Serial.begin(9600); // Se inicializa puerto serie
@@ -73,14 +85,18 @@ void setup()
   delay(5);
   pinMode(Led_Home, OUTPUT);
   pinMode(Led_Marcha, OUTPUT);
-  attachInterrupt(digitalPinToInterrupt(A), encoder, LOW); // interrupcion sobre pin A con funcion ISR encoder y modo LOW
-                                                           // Serial.println("Listo");                                    // imprime en monitor serial Listo
-  Wire.begin();                                            //Se inicializa la comunicación I2C
+  attachInterrupt(digitalPinToInterrupt(A), encoder, FALLING); // interrupcion sobre pin A con funcion ISR encoder y modo LOW
+                                                               //attachInterrupt(digitalPinToInterrupt(B), encoder, LOW);    // interrupcion sobre pin A con funcion ISR encoder y modo LOW
+                                                               // Serial.println("Listo");                                    // imprime en monitor serial Listo
+  Wire.begin(4);                                               // Inicia como esclavo con dirección 4 en la comunicación I2C
+  Wire.onReceive(receiveEvent);                                //Interrupción habilitada cuando el maestro envía bytes en la comunicación I2C
 
-  // attachInterrupt( 1, Pulsador_Stop, RISING);
+  //*********************************************************************************************************//
+  // Tomamos valores de presion del sistema con una interrupcion para graficar dicha presion
+  //*********************************************************************************************************//
 
-  Timer1.initialize(250000); // Dispara cada 250 ms
-  //        Timer1.attachInterrupt(Motor); // Activa la interrupcion y la asocia a motor
+  Timer1.initialize(250000); // Dispara cada 100 ms
+  Timer1.attachInterrupt(Presion_Grafica);
 
   //************************************************************************************************//
   // Inicializacion de la posicion de los brazos. Al encender se irán a posición Home
@@ -140,8 +156,6 @@ void setup()
 void loop()
 {
 
-  Serial.print("Posicion");
-  Serial.println(Posicion); // imprime valor de POSICION
   //*****************************************************************************************************************//
   // Lo voy a utilizar para chequear en el serie si el encoder cuenta correctamente
   //*****************************************************************************************************************//
@@ -153,6 +167,7 @@ void loop()
 
   while (Inicio_Ciclo) // Si inicio de ciclo es 1 el motor comienza su ciclo
   {
+
     //******************************************************************************************************************
     // Calculos de velocidades en Motor según pulsos de avance de apretado, relacion de transformacion y cantidad de pulsos por vuelta del motor
     //******************************************************************************************************************
@@ -182,9 +197,15 @@ void loop()
       digitalWrite(stepPin, LOW);
       delayMicroseconds(Velo_Motor_Insp / 2.0);
     }
-    delay(1000);
-    digitalWrite(dirPin, LOW);
+    Presion_PIP = Presion();
+    //  Serial.print("Valor Presion PIP:");
+    //  Serial.println(Presion_PIP);
+    delay(100);
+    Presion_Plateau = Presion();
+    // Serial.print("Valor Presion Plateau:");
+    // Serial.println(Presion_Plateau);
 
+    digitalWrite(dirPin, LOW);
     for (int i = 0; i < Pasos_Avance; i++) //Backward 1600 steps
     {
       digitalWrite(stepPin, HIGH);
@@ -192,22 +213,13 @@ void loop()
       digitalWrite(stepPin, LOW);
       delayMicroseconds(Velo_Motor_Exp / 2.0);
     }
-    //delay(1000);
-
-    // Guardar el tiempo actual para calcular el tiempo que tarda la lectura de los valores seteados
-    // y completar la espera de 1000 ms
-    unsigned long currentMillis = millis();
-    // Leer los valores configurados desde Mega
-    getConfiguredValues();
-    while (millis() < currentMillis + 1000)
-    {
-      /* wait */
-    }
+    Presion_PEEP = Presion();
+    //  Serial.print("Valor Presion PEEP:");
+    //  Serial.println(Presion_PEEP);
+    delay(1000);
   }
 
   digitalWrite(Led_Marcha, LOW);
-
-  // Cargar los valores obtenidos en las variables correspondientes
 
   //if( millis() - auxtimer > 10){
   //auxtimer = millis();
@@ -219,57 +231,67 @@ void loop()
 // Función de Lectura de datos enviados por el Maestro del bus I2C                                                                              //
 //**********************************************************************************************************************************************//
 
-void getConfiguredValues()
-{
-  Wire.requestFrom(2, 17);
+void receiveEvent(int quantidade_bytes_esperados)
+{ // Está código é executado quando "quantidade_bytes_esperados" foi recebido via I2C
 
-  byte values[17];
-  int i = 17;
-  while (Wire.available())
-  {
-    values[i] = Wire.read();
-    i--;
-  }
+  byte1 = Wire.read(); // Lê os 4 bytes enviados pelo mestre
+  byte2 = Wire.read();
+  byte3 = Wire.read();
+  byte4 = Wire.read();
+  byte5 = Wire.read(); // Lê os 4 bytes enviados pelo mestre
+  byte6 = Wire.read();
+  byte7 = Wire.read();
+  byte8 = Wire.read();
+  byte9 = Wire.read(); // Lê os 4 bytes enviados pelo mestre
+  byte10 = Wire.read();
+  byte11 = Wire.read();
+  byte12 = Wire.read();
+  byte13 = Wire.read(); // Lê os 4 bytes enviados pelo mestre
+  byte14 = Wire.read();
+  byte15 = Wire.read();
+  byte16 = Wire.read();
+  byte17 = Wire.read();
+  byte18 = Wire.read();
 
   // Velocidad de Inspiracion
-  aux1 = (values[2] << 8) | values[3];       // Ajusta a parte fracionáia (depois da vírgula)
+  aux1 = (byte3 << 8) | byte4;               // Ajusta a parte fracionáia (depois da vírgula)
   Velo_Inspiracion = (float)(aux1 * 0.0001); // Atribui a parte fracionária, depois da vírgula
-  aux1 = (values[0] << 8) | values[1];       // Ajusta a parte inteira (antes da vírgula)
+  aux1 = (byte1 << 8) | byte2;               // Ajusta a parte inteira (antes da vírgula)
   Velo_Inspiracion += aux1;                  // Atribui a parte iteira
                                              //  Serial.println("Velocidad de Inspiracion:");
                                              //  Serial.println(Velo_Inspiracion);
 
   // Velocidad de Expiracion
-  aux2 = (values[6] << 8) | values[7];      // Ajusta a parte fracionáia (depois da vírgula)
+  aux2 = (byte7 << 8) | byte8;              // Ajusta a parte fracionáia (depois da vírgula)
   Velo_Expiracion = (float)(aux2 * 0.0001); // Atribui a parte fracionária, depois da vírgula
-  aux2 = (values[4] << 8) | values[5];      // Ajusta a parte inteira (antes da vírgula)
+  aux2 = (byte5 << 8) | byte6;              // Ajusta a parte inteira (antes da vírgula)
   Velo_Expiracion += aux2;                  // Atribui a parte iteira
                                             //    Serial.println("Velocidad de Expiracion:");
                                             //   Serial.println(Velo_Expiracion);
 
   //Presion Maxima
-  aux3 = (values[10] << 8) | values[11]; // Ajusta a parte fracionáia (depois da vírgula)
-  PMAX = (float)(aux3 * 0.0001);         // Atribui a parte fracionária, depois da vírgula
-  aux3 = (values[8] << 8) | values[9];   // Ajusta a parte inteira (antes da vírgula)
-  PMAX += aux3;                          // Atribui a parte iteira
-                                         //   Serial.println("Presion Maxima:");
-                                         //   Serial.println(PMAX);
+  aux3 = (byte11 << 8) | byte12; // Ajusta a parte fracionáia (depois da vírgula)
+  PMAX = (float)(aux3 * 0.0001); // Atribui a parte fracionária, depois da vírgula
+  aux3 = (byte9 << 8) | byte10;  // Ajusta a parte inteira (antes da vírgula)
+  PMAX += aux3;                  // Atribui a parte iteira
+                                 //   Serial.println("Presion Maxima:");
+                                 //   Serial.println(PMAX);
 
   // Presion PEEP
-  aux4 = (values[14] << 8) | values[15]; // Ajusta a parte fracionáia (depois da vírgula)
-  PEEP = (float)(aux4 * 0.0001);         // Atribui a parte fracionária, depois da vírgula
-  aux4 = (values[12] << 8) | values[13]; // Ajusta a parte inteira (antes da vírgula)
-  PEEP += aux4;                          // Atribui a parte iteira
-                                         //   Serial.println("Presion PEEP:");
-                                         //   Serial.println(PEEP);
+  aux4 = (byte15 << 8) | byte16; // Ajusta a parte fracionáia (depois da vírgula)
+  PEEP = (float)(aux4 * 0.0001); // Atribui a parte fracionária, depois da vírgula
+  aux4 = (byte13 << 8) | byte14; // Ajusta a parte inteira (antes da vírgula)
+  PEEP += aux4;                  // Atribui a parte iteira
+                                 //   Serial.println("Presion PEEP:");
+                                 //   Serial.println(PEEP);
 
   //Inicio de Ciclo
-  Inicio_Ciclo = values[16];
+  Inicio_Ciclo = byte17;
   //   Serial.println("Inicio_Ciclo:");
   //  Serial.println(Inicio_Ciclo);
 
   //Porcentaje Volumen Tidal
-  Vtidal = values[17];
+  Vtidal = byte18;
   //    Serial.println("Volumen Tidal:");
   //    Serial.println(Vtidal);
 }
@@ -279,6 +301,7 @@ void getConfiguredValues()
 
 void encoder()
 {
+  static unsigned long ultimaInterrupcion = 0;     // variable static con ultimo valor de tiempo de interrupcion
   unsigned long tiempoInterrupcion = millis();     // variable almacena valor de func. millis
   if (tiempoInterrupcion - ultimaInterrupcion > 5) // rutina antirebote desestima pulsos menores a 5 mseg.
   {
@@ -292,5 +315,38 @@ void encoder()
     }
     Posicion = min(100, max(0, Posicion));   // establece limite inferior de 0 y superior de 100 para POSICION
     ultimaInterrupcion = tiempoInterrupcion; // guarda valor actualizado del tiempo de la interrupcion en variable static
+    Serial.print("Posicion");
+    Serial.println(Posicion); // imprime valor de POSICION
   }
+}
+
+// Funcion para la obtencion de los valores de presion en los puntos de la curva necesarios.
+
+double Presion()
+{
+  Aux = 0;
+  for (p = 0; p < 10; p++)
+  {
+    Aux = Aux + (float(analogRead(A0) * 5.0 / 1023.0)); //Leo la entrada analogica que tiene conectada el sensor de presión
+    delay(5);
+  }
+  Vout = Aux / 10.0;
+  PcmH2o = ((Vout - 0.04 * Vs + 0.01) / (0.09 * Vs)) * 10.1972; //Se multiplica por el equivalente para la conversion a cmH20
+  return PcmH2o;
+}
+
+// Funcion para la obtencion de una grafica de presion. Se desactiva luego de las pruebas
+
+void Presion_Grafica()
+{
+  Aux2 = 0;
+  for (g = 0; g < 10; g++)
+  {
+    Aux2 = Aux2 + (float(analogRead(A0) * 5.0 / 1023.0)); //Leo la entrada analogica que tiene conectada el sensor de presión
+    delay(5);
+  }
+  Vout2 = Aux2 / 10.0;
+  PcmH2o_Grafica = ((Vout2 - 0.04 * Vs + 0.01) / (0.09 * Vs)) * 10.1972; //Se multiplica por el equivalente para la conversion a cmH20
+  Serial.print("Presion del sistema:");
+  Serial.println(PcmH2o);
 }
