@@ -203,6 +203,7 @@ void loop()
                 // Cambiar el estado del ciclo
                 CicloActual = EXPIRACION;
                 Pasos_Avance = 0;
+                delay(1000);
             }
         }
         else if (CicloActual == EXPIRACION)
@@ -224,9 +225,9 @@ void loop()
                 // Cambiar el estado del ciclo
                 CicloActual = INSPIRACION;
                 Pasos_Avance = 0;
+                delay(1000);
             }
         }
-        delay(1000);
     }
     else
     {
