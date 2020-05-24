@@ -189,6 +189,7 @@ void loop()
                 delayMicroseconds(Velo_Motor_Insp / 2.0);
                 digitalWrite(stepPin, LOW);
                 delayMicroseconds(Velo_Motor_Insp / 2.0);
+                Pasos_Actuales++;
             }
             else
             {
@@ -215,6 +216,7 @@ void loop()
                 delayMicroseconds(Velo_Motor_Exp / 2.0);
                 digitalWrite(stepPin, LOW);
                 delayMicroseconds(Velo_Motor_Exp / 2.0);
+                Pasos_Actuales++;
             }
             else
             {
