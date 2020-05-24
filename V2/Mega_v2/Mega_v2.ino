@@ -50,7 +50,6 @@ float Velo_Expiracion = 0.0;
 float Velo_Expiracion_Anterior = 0.0;
 float Velo_Expiracion_Tx = 0.0;
 
-
 //*********************************************************************************************************//
 // SETUP
 //*********************************************************************************************************//
@@ -70,7 +69,6 @@ void setup()
   attachInterrupt(4, Pulsador_Parada, CHANGE); //Defino interrupcion 6 Pin 19 para pulsador de parada
 }
 
-
 //*********************************************************************************************************//
 // LOOP
 //*********************************************************************************************************//
@@ -88,7 +86,7 @@ void loop()
     Inicio_Ciclo = 1;
     Pulsador_Marcha_VALUE_Anterior = Pulsador_Marcha_VALUE;
   }
-  
+
   // Movimiento entre pantallas                                                                                            //
   if (Pulsador_Pantalla_VALUE == HIGH & Pulsador_Pantalla_Anterior_VALUE == LOW)
   {

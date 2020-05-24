@@ -3,13 +3,15 @@
 #include <Wire.h>
 
 typedef enum TipoDeCiclo
-{ 
+{
     INSPIRACION,
-    EXPIRACION
+    EXPIRACION,
+    ALARMA_PIP,
+    ALARMA_PEEP
 };
 
-bool Modo_ON = false;      // Inicializacion en ciclo de REPOSO
-TipoDeCiclo CicloActual = INSPIRACION; 
+bool Modo_ON = false; // Inicializacion en ciclo de REPOSO
+TipoDeCiclo CicloActual = INSPIRACION;
 
 float Velo_Inspiracion = 0.0;
 float Velo_Expiracion = 0.0;
@@ -19,8 +21,8 @@ float PEEP = 0;
 int Vtidal = 0;
 
 //Enconder
-#define A 2                                          //variable A del econder a pin digital 2 (DT en modulo)
-#define B 4                                          //variable B del encoder a pin digital 4 (CLK en modulo)
+#define A 2                                           //variable A del econder a pin digital 2 (DT en modulo)
+#define B 4                                           //variable B del encoder a pin digital 4 (CLK en modulo)
 volatile int Posicion = 100;                          // variable Posicion con valor inicial de 0 y definida como global al ser usada en loop e ISR (encoder)
 volatile unsigned long encoderUltimaInterrupcion = 0; // variable static con ultimo valor de tiempo de interrupcion
 
@@ -180,8 +182,9 @@ void loop()
         }
 
         // Manejar los ciclos
-        if (CicloActual == INSPIRACION)
+        switch (CicloActual)
         {
+        case INSPIRACION:
             digitalWrite(dirPin, HIGH);
             if (Pasos_Actuales < Pasos_Avance)
             {
@@ -193,22 +196,16 @@ void loop()
             }
             else
             {
-                Presion_PIP = Presion();
-                //  Serial.print("Valor Presion PIP:");
-                //  Serial.println(Presion_PIP);
-                delay(100);
-                Presion_Plateau = Presion();
-                // Serial.print("Valor Presion Plateau:");
-                // Serial.println(Presion_Plateau);
+                // Chequear presión PIP al final del ciclo de inspiración
+                ChequeoPIP();
 
                 // Cambiar el estado del ciclo
                 CicloActual = EXPIRACION;
                 Pasos_Actuales = 0;
                 delay(1000);
             }
-        }
-        else if (CicloActual == EXPIRACION)
-        {
+            break;
+        case EXPIRACION:
             digitalWrite(dirPin, LOW);
             if (Pasos_Actuales < Pasos_Avance)
             {
@@ -220,15 +217,21 @@ void loop()
             }
             else
             {
-                Presion_PEEP = Presion();
-                //  Serial.print("Valor Presion PEEP:");
-                //  Serial.println(Presion_PEEP);
+                // Chequear presión PEEP al final del ciclo de inspiración
+                ChequeoPEEP();
 
                 // Cambiar el estado del ciclo
                 CicloActual = INSPIRACION;
                 Pasos_Actuales = 0;
                 delay(1000);
             }
+            break;
+        case ALARMA_PEEP:
+            break;
+        case ALARMA_PIP:
+            break;
+        default:
+            break;
         }
     }
     else
@@ -284,7 +287,7 @@ void receiveEvent(int cantBytes)
     aux = (byte11 << 8) | byte12; // Ajusta a parte fracionáia (depois da vírgula)
     PMAX = (float)(aux * 0.0001); // Atribui a parte fracionária, depois da vírgula
     aux = (byte9 << 8) | byte10;  // Ajusta a parte inteira (antes da vírgula)
-    PMAX += aux;                 // Atribui a parte iteira
+    PMAX += aux;                  // Atribui a parte iteira
                                   //   Serial.println("Presion Maxima:");
                                   //   Serial.println(PMAX);
 
@@ -292,7 +295,7 @@ void receiveEvent(int cantBytes)
     aux = (byte15 << 8) | byte16; // Ajusta a parte fracionáia (depois da vírgula)
     PEEP = (float)(aux * 0.0001); // Atribui a parte fracionária, depois da vírgula
     aux = (byte13 << 8) | byte14; // Ajusta a parte inteira (antes da vírgula)
-    PEEP += aux;                 // Atribui a parte iteira
+    PEEP += aux;                  // Atribui a parte iteira
                                   //   Serial.println("Presion PEEP:");
                                   //   Serial.println(PEEP);
 
@@ -308,7 +311,7 @@ void receiveEvent(int cantBytes)
 //**********************************************************************************************************************************************//
 void encoder()
 {
-    unsigned long tiempoInterrupcion = millis();     // variable almacena valor de func. millis
+    unsigned long tiempoInterrupcion = millis();            // variable almacena valor de func. millis
     if (tiempoInterrupcion - encoderUltimaInterrupcion > 5) // rutina antirebote desestima pulsos menores a 5 mseg.
     {
         if (digitalRead(B) == HIGH) // si B es HIGH, sentido horario
@@ -340,6 +343,32 @@ double Presion()
     Vout = Aux / 10.0;
     PcmH2o = ((Vout - 0.04 * Vs + 0.01) / (0.09 * Vs)) * 10.1972; //Se multiplica por el equivalente para la conversion a cmH20
     return PcmH2o;
+}
+
+void ChequeoPIP()
+{
+    double pipSeteada = 100;
+    Presion_PIP = Presion();
+    delay(100);
+    Presion_Plateau = Presion();
+    if (Presion_PIP > pipSeteada)
+    {
+        stepper.setCurrentPosition(0);
+        stepper.runToPosition();
+        CicloActual = ALARMA_PIP;
+    }
+}
+
+void ChequeoPEEP()
+{
+    double peepSeteada = 100;
+    Presion_PEEP = Presion();
+    if (Presion_PIP > peepSeteada)
+    {
+        stepper.setCurrentPosition(0);
+        stepper.runToPosition();
+        CicloActual = ALARMA_PEEP;
+    }
 }
 
 //**********************************************************************************************************************************************//
