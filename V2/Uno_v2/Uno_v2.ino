@@ -402,7 +402,7 @@ void Presion_Grafica()
 void IrAlInicio()
 {
     digitalWrite(dirPin, LOW);
-    for (int i = Pasos_Actuales; i < Pasos_Avance; i++) //Backward 1600 steps
+    for (int i = 0; i < Pasos_Actuales; i++) //Backward 1600 steps
     {
       digitalWrite(stepPin, HIGH);
       delayMicroseconds(Velo_Motor_Exp / 2.0);
