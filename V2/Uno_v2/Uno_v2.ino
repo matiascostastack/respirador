@@ -14,7 +14,7 @@ typedef enum TipoDeAlarma
     ALARMA_PIP,
     ALARMA_PEEP,
     SIN_ALARMA
-}
+};
 
 bool Modo_ON = false; // Inicializacion en ciclo de REPOSO
 TipoDeCiclo CicloActual = INSPIRACION;
@@ -50,6 +50,7 @@ AccelStepper stepper = AccelStepper(motorInterfaceType, stepPin, dirPin);
 #define Buzzer_Pin 20
 #define Tono_Alarma 250
 #define Tiempo_Alarma 1000
+bool Alarma_ON = false;
 unsigned long Tiempo_Alarma_Transcurrido = 0;
 
 // Seteos de valores de la relacion y configuracion del sistema. Al variarlos aqui variaran uniformamente en la logica
@@ -173,8 +174,15 @@ void loop()
     {
         switch (AlarmaActual)
         {
+        case ALARMA_PIP:    // No debería entrar en esta opcion pero por las dudas se contempla
+            AlarmaContinua();
+            Modo_ON = false;
+            break;
         case ALARMA_PEEP:
-            //analogWrite(Buzzer_Pin, Tone_Emergencia); // Cambiamos este valor para oir distintos sonidos.
+            AlarmaIntermitente();
+            break;
+        case SIN_ALARMA:
+            SilenciarAlarma();
             break;
         default:
             break;
@@ -259,10 +267,20 @@ void loop()
     }
     else
     {
-        if (digitalRead(Led_Marcha) == HIGH)
-            IrAlInicio();
+        if (AlarmaActual == ALARMA_PIP)
+        {
+            AlarmaContinua();
+        }
+        else
+        {
+            SilenciarAlarma();
+            Pasos_Avance = 0;   // Setear el valor en cero para que se calculen los parametros cuando se reactiva
 
-        digitalWrite(Led_Marcha, LOW);
+            if (digitalRead(Led_Marcha) == HIGH)
+                IrAlInicio();
+
+            digitalWrite(Led_Marcha, LOW);
+        }
     }
 }
 
@@ -327,6 +345,8 @@ void receiveEvent(int cantBytes)
 
     //Inicio de Ciclo
     Modo_ON = (bool)byte17;
+    if (Modo_ON)
+        AlarmaActual = SIN_ALARMA;
 
     //Porcentaje Volumen Tidal
     Vtidal = byte18;
@@ -392,8 +412,10 @@ void ChequeoPIP()
     Presion_Plateau = Presion();
     if (Presion_PIP > PMAX)
     {
+        InformarAlarma(ALARMA_PIP);
         IrAlInicio();
         AlarmaActual = ALARMA_PIP;
+        Modo_ON = false;
     }
 }
 
@@ -402,6 +424,7 @@ void ChequeoPEEP()
     Presion_PEEP = Presion();
     if (Presion_PIP > PMAX)
     {
+        InformarAlarma(ALARMA_PEEP);
         IrAlInicio();
         AlarmaActual = ALARMA_PEEP;
     }
@@ -457,9 +480,33 @@ void IrAlInicio()
 //**********************************************************************************************************************************************//
 void AlarmaIntermitente()
 {
+    if ((unsigned long)millis() - Tiempo_Alarma_Transcurrido > 1000)
+    {
+        if (Alarma_ON)
+        {
+            SilenciarAlarma();
+            Alarma_ON = false;
+        }
+        else
+        {
+            analogWrite(Buzzer_Pin, Tono_Alarma);
+            Alarma_ON = true;
+        }
+        Tiempo_Alarma_Transcurrido = millis();
+    }
 }
 
-void TerminarAlarma()
+void AlarmaContinua()
+{
+    analogWrite(Buzzer_Pin, Tono_Alarma);
+}
+
+void SilenciarAlarma()
 {
     analogWrite(Buzzer_Pin, 0);
+}
+
+void InformarAlarma(TipoDeAlarma alarma)
+{
+    // Comunicar al controlador de pantalla el tipo de alarma
 }
