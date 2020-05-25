@@ -263,7 +263,7 @@ void receiveEvent(int cantBytes)
     byte17 = Wire.read();
     byte18 = Wire.read();
 
-    byte aux;
+    unsigned int aux;
     // Velocidad de Inspiracion
     aux = (byte3 << 8) | byte4;               // Ajusta a parte fracionáia (depois da vírgula)
     Velo_Inspiracion = (float)(aux * 0.0001); // Atribui a parte fracionária, depois da vírgula
@@ -362,4 +362,12 @@ void Presion_Grafica()
     PcmH2o_Grafica = ((Vout2 - 0.04 * Vs + 0.01) / (0.09 * Vs)) * 10.1972; //Se multiplica por el equivalente para la conversion a cmH20
     Serial.print("Presion del sistema:");
     Serial.println(PcmH2o);
+}
+
+//**********************************************************************************************************************************************//
+// Funciones de posicionamiento de los brazos
+//**********************************************************************************************************************************************//
+void IrAlInicio()
+{
+
 }
