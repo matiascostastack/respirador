@@ -6,12 +6,19 @@ typedef enum TipoDeCiclo
 {
     INSPIRACION,
     EXPIRACION,
-    ALARMA_PIP,
-    ALARMA_PEEP
+    INICIO
 };
+
+typedef enum TipoDeAlarma
+{
+    ALARMA_PIP,
+    ALARMA_PEEP,
+    SIN_ALARMA
+}
 
 bool Modo_ON = false; // Inicializacion en ciclo de REPOSO
 TipoDeCiclo CicloActual = INSPIRACION;
+TipoDeAlarma AlarmaActual = SIN_ALARMA;
 
 float Velo_Inspiracion = 0.0;
 float Velo_Expiracion = 0.0;
@@ -39,6 +46,12 @@ AccelStepper stepper = AccelStepper(motorInterfaceType, stepPin, dirPin);
 #define Led_Home 12
 #define Led_Marcha 11
 
+// Alarmas
+#define Buzzer_Pin 20
+#define Tono_Alarma 250
+#define Tiempo_Alarma 1000
+unsigned long Tiempo_Alarma_Transcurrido = 0;
+
 // Seteos de valores de la relacion y configuracion del sistema. Al variarlos aqui variaran uniformamente en la logica
 float Angulo_Brazos = 0;
 float Relacion_Transmision = 5;
@@ -63,12 +76,17 @@ double Presion_PEEP = 0.0;
 // Flag de Interrupciones
 bool Presion_Grafica_Interrupcion_Flag = false;
 
+// Auxiliares
+unsigned long Tiempo_Ciclo = 0;
+
 //*********************************************************************************************************//
 // SETUP
 //*********************************************************************************************************//
 void setup()
 {
     Serial.begin(9600); // Se inicializa puerto serie
+
+    pinMode(Buzzer_Pin, OUTPUT); // Buzzer
 
     pinMode(A, INPUT);           // A donde se encuentra el encoder como entrada
     pinMode(B, INPUT);           // B donde se encuentra el encoder como entrada
@@ -153,24 +171,18 @@ void loop()
 {
     if (Modo_ON)
     {
-        //******************************************************************************************************************
-        // Calculos de velocidades en Motor según pulsos de avance de apretado, relacion de transformacion y cantidad de pulsos por vuelta del motor
-        //******************************************************************************************************************
+        switch (AlarmaActual)
+        {
+        case ALARMA_PEEP:
+            //analogWrite(Buzzer_Pin, Tone_Emergencia); // Cambiamos este valor para oir distintos sonidos.
+            break;
+        default:
+            break;
+        }
 
-        Pasos_Avance = (Vtidal * Cantidad_Pulsos_Apriete) / 100;
-        Angulo_Pulso = 360.0 / Cantidad_Pulsos_Motor;
-        Angulo_Brazos = ((Pasos_Avance * 360) / (Cantidad_Pulsos_Motor * Relacion_Transmision));
-        Velo_Motor_Insp = (Angulo_Pulso / ((Angulo_Brazos * Relacion_Transmision) / Velo_Inspiracion)) * 1000000.0;
-        Velo_Motor_Exp = (Angulo_Pulso / ((Angulo_Brazos * Relacion_Transmision) / Velo_Expiracion)) * 1000000.0;
-
-        //Serial.print("Pasos Avance: ");
-        //Serial.println(Pasos_Avance);
-        //Serial.print("Angulo Brazos: ");
-        //Serial.println(Angulo_Brazos);
-        //Serial.print("Velocidad inspiracion: ");
-        //Serial.println(Velo_Motor_Insp);
-        //Serial.print("Velocidad Expiracion: ");
-        //Serial.println(Velo_Motor_Exp);
+        // Si todavia no fueron seteados los parametros llamar a la funcion
+        if (Pasos_Avance == 0)
+            CalcularParametros();
 
         digitalWrite(Led_Marcha, HIGH);
 
@@ -202,6 +214,12 @@ void loop()
                 // Cambiar el estado del ciclo
                 CicloActual = EXPIRACION;
                 Pasos_Actuales = 0;
+
+                // Imprimer el tiempo que duro el ciclo de inspiracion
+                Serial.print("Tiempo Expiracion: ");
+                Serial.println((millis() - Tiempo_Ciclo) / 1000);
+                Tiempo_Ciclo = millis();
+
                 delay(1000);
             }
             break;
@@ -223,12 +241,17 @@ void loop()
                 // Cambiar el estado del ciclo
                 CicloActual = INSPIRACION;
                 Pasos_Actuales = 0;
+
+                // Imprimer el tiempo que duro el ciclo de expiracion
+                Serial.print("Tiempo Expiracion: ");
+                Serial.println((millis() - Tiempo_Ciclo) / 1000);
+                Tiempo_Ciclo = millis();
+
+                // Calcula los parametro para el siguiente ciclo
+                CalcularParametros();
+
                 delay(1000);
             }
-            break;
-        case ALARMA_PEEP:
-            break;
-        case ALARMA_PIP:
             break;
         default:
             break;
@@ -237,10 +260,8 @@ void loop()
     else
     {
         if (digitalRead(Led_Marcha) == HIGH)
-        {
             IrAlInicio();
-            CicloActual = INSPIRACION;
-        }
+
         digitalWrite(Led_Marcha, LOW);
     }
 }
@@ -312,6 +333,19 @@ void receiveEvent(int cantBytes)
 }
 
 //**********************************************************************************************************************************************//
+// Función para calcular los valores de funcionamiento
+// Calculos de velocidades en Motor según pulsos de avance de apretado, relacion de transformacion y cantidad de pulsos por vuelta del motor
+//******************************************************************************************************************
+void CalcularParametros()
+{
+    Pasos_Avance = (Vtidal * Cantidad_Pulsos_Apriete) / 100;
+    Angulo_Pulso = 360.0 / Cantidad_Pulsos_Motor;
+    Angulo_Brazos = ((Pasos_Avance * 360) / (Cantidad_Pulsos_Motor * Relacion_Transmision));
+    Velo_Motor_Insp = (Angulo_Pulso / ((Angulo_Brazos * Relacion_Transmision) / Velo_Inspiracion)) * 1000000.0;
+    Velo_Motor_Exp = (Angulo_Pulso / ((Angulo_Brazos * Relacion_Transmision) / Velo_Expiracion)) * 1000000.0;
+}
+
+//**********************************************************************************************************************************************//
 // Función de Lectura de datos del encoder                                                                            //
 //**********************************************************************************************************************************************//
 void encoder()
@@ -342,12 +376,12 @@ double Presion()
     float Aux = 0.0;
     int p = 0;
     for (p = 0; p < 10; p++)
-        {
-        Aux = Aux + (float(analogRead(A0) *5.0 / 1023.0)); //Leo la entrada analogica que tiene conectada el sensor de presión
+    {
+        Aux = Aux + (float(analogRead(A0) * 5.0 / 1023.0)); //Leo la entrada analogica que tiene conectada el sensor de presión
         delay(5);
     }
-    Vout = Aux/10.0;
-    PcmH2o_Grafica = (((Vout2 - 0.04 * Vs + 0.20) / (0.09 * Vs))) * 10,1972.0; //Se multiplica por el equivalente para la conversion a cmH20
+    Vout = Aux / 10.0;
+    PcmH2o_Grafica = (((Vout2 - 0.04 * Vs + 0.20) / (0.09 * Vs))) * 10, 1972.0; //Se multiplica por el equivalente para la conversion a cmH20
     return PcmH2o;
 }
 
@@ -359,7 +393,7 @@ void ChequeoPIP()
     if (Presion_PIP > PMAX)
     {
         IrAlInicio();
-        CicloActual = ALARMA_PIP;
+        AlarmaActual = ALARMA_PIP;
     }
 }
 
@@ -369,7 +403,7 @@ void ChequeoPEEP()
     if (Presion_PIP > PMAX)
     {
         IrAlInicio();
-        CicloActual = ALARMA_PEEP;
+        AlarmaActual = ALARMA_PEEP;
     }
 }
 
@@ -386,13 +420,13 @@ void Presion_Grafica()
     float Aux2 = 0.0;
     int g = 0;
     for (g = 0; g < 10; g++)
-        {
-        Aux2 = Aux2 + (float(analogRead(A0) *5.0 / 1023.0)); //Leo la entrada analogica que tiene conectada el sensor de presión
+    {
+        Aux2 = Aux2 + (float(analogRead(A0) * 5.0 / 1023.0)); //Leo la entrada analogica que tiene conectada el sensor de presión
         delay(5);
     }
-    Vout2 = Aux2/10.0;
-    PcmH2o_Grafica = (((Vout2 - 0.04 * Vs + 0.20) / (0.09 * Vs))) * 10,1972.0; //Se multiplica por el equivalente para la conversion a cmH20
-    Serial.print("Presion del sistema:"); 
+    Vout2 = Aux2 / 10.0;
+    PcmH2o_Grafica = (((Vout2 - 0.04 * Vs + 0.20) / (0.09 * Vs))) * 10, 1972.0; //Se multiplica por el equivalente para la conversion a cmH20
+    Serial.print("Presion del sistema:");
     Serial.println(PcmH2o_Grafica);
 }
 
@@ -409,10 +443,23 @@ void IrAlInicio()
     digitalWrite(dirPin, LOW);
     for (int i = 0; i < pasos; i++) //Backward 1600 steps
     {
-      digitalWrite(stepPin, HIGH);
-      delayMicroseconds(Velo_Motor_Exp / 2.0);
-      digitalWrite(stepPin, LOW);
-      delayMicroseconds(Velo_Motor_Exp / 2.0);
+        digitalWrite(stepPin, HIGH);
+        delayMicroseconds(Velo_Motor_Exp / 2.0);
+        digitalWrite(stepPin, LOW);
+        delayMicroseconds(Velo_Motor_Exp / 2.0);
     }
     Pasos_Actuales = 0;
+    CicloActual = INSPIRACION;
+}
+
+//**********************************************************************************************************************************************//
+// Alarmas
+//**********************************************************************************************************************************************//
+void AlarmaIntermitente()
+{
+}
+
+void TerminarAlarma()
+{
+    analogWrite(Buzzer_Pin, 0);
 }
