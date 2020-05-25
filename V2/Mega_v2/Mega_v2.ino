@@ -18,7 +18,6 @@ int Pulsador_Pantalla_Anterior_VALUE = 0; // Se guarda el valor anetrior para le
 #define Pulsador_Seleccion 3               // Seleccion de entrada para Pulsador navegar en pantallas
 int Pulsador_Seleccion_VALUE = 0;          // Variable que guarda el estado de la entrada
 int Pulsador_Seleccion_Anterior_VALUE = 0; // Se guarda el valor anetrior para leer flancos ascendentes en la señal de entrada
-int Inicio_Ciclo = 0;
 
 // Pulsador de Marcha
 #define Pulsador_Marcha 18
@@ -32,23 +31,21 @@ int BPM_Seleccionado = 15;
 int IE_Seleccionado = 0;
 int PMAX_Seleccionado = 30;
 int PMAX_Seleccionado_Anterior = 30;
-int PMAX_Tx = 30;
 int PEEP_Seleccionado = 5;
 int PEEP_Seleccionado_Anterior = 5;
-int PEEP_Tx = 5;
 int Vtidal_Seleccionado = 40; //(En porcentaje. 40 %. Caudal total del ambu 1500ml)
 int Vtidal_Seleccionado_Anterior = 40;
-int Vtidal_Seleccionado_Tx = 40;
 float Tciclo = 0.0;
 float Tinspiracion = 0.0;
 float Texpiracion = 0.0;
 
 float Velo_Inspiracion = 0.0;
 float Velo_Inspiracion_Anterior = 0.0;
-float Velo_Inspiracion_Tx = 0.0;
 float Velo_Expiracion = 0.0;
 float Velo_Expiracion_Anterior = 0.0;
-float Velo_Expiracion_Tx = 0.0;
+
+volatile bool Modo_ON = false;     // Inicializacion en ciclo de REPOSO
+volatile bool Cambio_Modo = false; // Indica si hubo un cambio de estado que necesita ser transmitido
 
 //*********************************************************************************************************//
 // SETUP
@@ -83,8 +80,10 @@ void loop()
 
   if (Pulsador_Marcha_VALUE == HIGH & Pulsador_Marcha_VALUE_Anterior == LOW)
   {
-    Inicio_Ciclo = 1;
+    Modo_ON = true;
+    Cambio_Modo = true;
     Pulsador_Marcha_VALUE_Anterior = Pulsador_Marcha_VALUE;
+    Serial.print("------ PARADA ------");
   }
 
   // Movimiento entre pantallas                                                                                            //
@@ -382,7 +381,7 @@ void loop()
 
   //
 
-  if ((Velo_Inspiracion != Velo_Inspiracion_Anterior) || (Velo_Expiracion != Velo_Expiracion_Anterior) || (PMAX_Seleccionado != PMAX_Seleccionado_Anterior) || (PEEP_Seleccionado != PEEP_Seleccionado_Anterior) || (Vtidal_Seleccionado != Vtidal_Seleccionado_Anterior))
+  if ((Velo_Inspiracion != Velo_Inspiracion_Anterior) || (Velo_Expiracion != Velo_Expiracion_Anterior) || (PMAX_Seleccionado != PMAX_Seleccionado_Anterior) || (PEEP_Seleccionado != PEEP_Seleccionado_Anterior) || (Vtidal_Seleccionado != Vtidal_Seleccionado_Anterior) || Cambio_Modo)
   // (Pulsador_Marcha_VALUE == digitalRead(19))
   {
     byte byte1, byte2, byte3, byte4, byte5, byte6, byte7, byte8, byte9, byte10, byte11, byte12, byte13, byte14, byte15, byte16, byte17, byte18;
@@ -390,7 +389,7 @@ void loop()
 
     // Se envia Velocidad de Inspiracion
     // Ajustando o número antes da vírgula
-    Velo_Inspiracion_Tx = Velo_Inspiracion;
+    float Velo_Inspiracion_Tx = Velo_Inspiracion;
     aux = (unsigned int)Velo_Inspiracion_Tx; // aux = 46689, Pega somente a parte inteira da variável float (0 - 65536)
     byte2 = aux;                             // byte2 = 0B01100001, pega apenas os primeros 8 bits
     byte1 = (aux >> 8);                      // byte1 = 0B10110110, pega os 8 ultimos bits
@@ -402,7 +401,7 @@ void loop()
     byte3 = (aux >> 8);                      // byte1 = 0B00100010, pega os 8 ultimos bits
 
     //Se envia velocidad de Expiracion
-    Velo_Expiracion_Tx = Velo_Expiracion;
+    float Velo_Expiracion_Tx = Velo_Expiracion;
     aux = (unsigned int)Velo_Expiracion_Tx; // aux = 46689, Pega somente a parte inteira da variável float (0 - 65536)
     byte6 = aux;                            // byte2 = 0B01100001, pega apenas os primeros 8 bits
     byte5 = (aux >> 8);                     // byte1 = 0B10110110, pega os 8 ultimos bits
@@ -414,7 +413,7 @@ void loop()
     byte7 = (aux >> 8);                     // byte1 = 0B00100010, pega os 8 ultimos bits
 
     //Se envia Presion MAxima de trabajo
-    PMAX_Tx = PMAX_Seleccionado;
+    float PMAX_Tx = PMAX_Seleccionado;
     aux = (unsigned int)PMAX_Tx; // aux = 46689, Pega somente a parte inteira da variável float (0 - 65536)
     byte10 = aux;                // byte2 = 0B01100001, pega apenas os primeros 8 bits
     byte9 = (aux >> 8);          // byte1 = 0B10110110, pega os 8 ultimos bits
@@ -426,7 +425,7 @@ void loop()
     byte11 = (aux >> 8);         // byte1 = 0B00100010, pega os 8 ultimos bits
 
     //Se envia Presion PEEP
-    PEEP_Tx = PEEP_Seleccionado;
+    float PEEP_Tx = PEEP_Seleccionado;
     aux = (unsigned int)PEEP_Tx; // aux = 46689, Pega somente a parte inteira da variável float (0 - 65536)
     byte14 = aux;                // byte2 = 0B01100001, pega apenas os primeros 8 bits
     byte13 = (aux >> 8);         // byte1 = 0B10110110, pega os 8 ultimos bits
@@ -438,11 +437,10 @@ void loop()
     byte15 = (aux >> 8);         // byte1 = 0B00100010, pega os 8 ultimos bits
 
     //Envio la variable Inicio de Ciclo
-    byte17 = Inicio_Ciclo;
+    byte17 = Modo_ON;
 
     //Envio el porcentaje de caudal de aire
-    Vtidal_Seleccionado_Tx = Vtidal_Seleccionado;
-    byte18 = Vtidal_Seleccionado_Tx;
+    byte18 = Vtidal_Seleccionado;
 
     //Inicia transmision de Bytes
     Wire.beginTransmission(4); // Começa transmissão para o escravo 0x2C
@@ -472,6 +470,7 @@ void loop()
   PMAX_Seleccionado_Anterior = PMAX_Seleccionado;
   PEEP_Seleccionado_Anterior = PEEP_Seleccionado;
   Vtidal_Seleccionado_Anterior = Vtidal_Seleccionado;
+  Cambio_Modo = false;
 }
 
 //****************************************************************************************************************
@@ -487,7 +486,7 @@ void loop()
 
 void Pulsador_Parada()
 {
-  Inicio_Ciclo = 0;
-  Serial.print("Inicio_Ciclo:");
-  Serial.println(Inicio_Ciclo);
+  Modo_ON = false;
+  Cambio_Modo = true;
+  Serial.print("------ PARADA ------");
 }

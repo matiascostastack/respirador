@@ -1,4 +1,0 @@
-{
-    "board": "arduino:avr:uno",
-    "sketch": "v2/Uno_v2/uno_v2.ino"
-}
