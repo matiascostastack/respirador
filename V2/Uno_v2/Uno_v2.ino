@@ -401,8 +401,13 @@ void Presion_Grafica()
 //**********************************************************************************************************************************************//
 void IrAlInicio()
 {
+    int pasos;
+    if (CicloActual == INSPIRACION)
+        pasos = Pasos_Actuales;
+    if (CicloActual == EXPIRACION)
+        pasos = Pasos_Avance - Pasos_Actuales;
     digitalWrite(dirPin, LOW);
-    for (int i = 0; i < Pasos_Actuales; i++) //Backward 1600 steps
+    for (int i = 0; i < pasos; i++) //Backward 1600 steps
     {
       digitalWrite(stepPin, HIGH);
       delayMicroseconds(Velo_Motor_Exp / 2.0);
