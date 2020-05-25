@@ -78,21 +78,21 @@ void loop()
   Pulsador_Seleccion_VALUE = digitalRead(Pulsador_Seleccion); // Lectura del estado del pulsador Selección
   Pulsador_Marcha_VALUE = digitalRead(Pulsador_Marcha);
 
-  if (Pulsador_Marcha_VALUE == HIGH & Pulsador_Marcha_VALUE_Anterior == LOW)
+  if (Pulsador_Marcha_VALUE == HIGH && Pulsador_Marcha_VALUE_Anterior == LOW)
   {
     Modo_ON = true;
     Cambio_Modo = true;
-    Pulsador_Marcha_VALUE_Anterior = Pulsador_Marcha_VALUE;
     Serial.print("------ PARADA ------");
   }
+  Pulsador_Marcha_VALUE_Anterior = Pulsador_Marcha_VALUE;
 
   // Movimiento entre pantallas                                                                                            //
-  if (Pulsador_Pantalla_VALUE == HIGH & Pulsador_Pantalla_Anterior_VALUE == LOW)
+  if (Pulsador_Pantalla_VALUE == HIGH && Pulsador_Pantalla_Anterior_VALUE == LOW)
   {
     Contador_Pantalla++;
     lcd.clear();
-    Pulsador_Pantalla_Anterior_VALUE = Pulsador_Pantalla_VALUE;
   }
+  Pulsador_Pantalla_Anterior_VALUE = Pulsador_Pantalla_VALUE;
 
   switch (Contador_Pantalla)
   {
@@ -109,7 +109,7 @@ void loop()
 
     if (Pulsador_Seleccion_VALUE == HIGH)
     {
-      if (Pote_Display<31 & Pote_Display> 7)
+      if (Pote_Display < 31 && Pote_Display > 7)
       {
         lcd.setCursor(11, 1);
         lcd.clear();
@@ -145,7 +145,7 @@ void loop()
     lcd.print("SEL:"); // Escribimos el Mensaje en el LCD.
     lcd.setCursor(4, 1);
 
-    if (Pulsador_Seleccion_VALUE == HIGH & Pulsador_Seleccion_Anterior_VALUE == LOW)
+    if (Pulsador_Seleccion_VALUE == HIGH && Pulsador_Seleccion_Anterior_VALUE == LOW)
     {
       Contador_IE++;
       lcd.clear();
@@ -203,7 +203,7 @@ void loop()
     if (Pulsador_Seleccion_VALUE == HIGH)
     {
 
-      if (Pote_Display<40 & Pote_Display> 0)
+      if (Pote_Display < 40 && Pote_Display > 0)
       {
         lcd.setCursor(11, 1);
         lcd.clear();
@@ -245,7 +245,7 @@ void loop()
 
     if (Pulsador_Seleccion_VALUE == HIGH)
     {
-      if (Pote_Display<10 & Pote_Display> 0)
+      if (Pote_Display < 10 && Pote_Display > 0)
       {
         lcd.setCursor(11, 1);
         lcd.clear();
@@ -287,7 +287,7 @@ void loop()
 
     if (Pulsador_Seleccion_VALUE == HIGH)
     {
-      if (Pote_Display<101 & Pote_Display> 0)
+      if (Pote_Display < 101 && Pote_Display > 0)
       {
         lcd.setCursor(11, 1);
         lcd.clear();
