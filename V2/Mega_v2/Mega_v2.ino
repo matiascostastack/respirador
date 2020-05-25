@@ -1,13 +1,15 @@
 #include <Wire.h>
 #include <LCD.h>
-#include <LiquidCrystal_I2C.h>
+#include <LiquidCrystal.h>
+#include <Encoder.h>
 
 //#include <LiquidCrystal.h>
 
-// Potenciometro
-#define Pote A0                                   // Se selecciona la entrada A0 para la lectura analogica del potenciometro
-int Pote_Value;                                   // variable que almacena el valor raw de A0 (0 a 1023)
-LiquidCrystal_I2C lcd(0x27, 2, 1, 0, 4, 5, 6, 7); // Inicializa el LCD con DIR, E, RW, RS, D4, D5, D6, D7)
+// Encoder
+Encoder myEnc(12, 13);
+
+// Pantalla
+LiquidCrystal lcd(8, 9, 4, 5, 6, 7); // Inicializa el LCD con DIR, E, RW, RS, D4, D5, D6, D7)
 
 // Pulsador Pantalla
 #define Pulsador_Pantalla 2               // Seleccion de entrada para Pulsador navegar en pantallas
@@ -26,6 +28,8 @@ int Pulsador_Marcha_VALUE_Anterior = 0;
 
 int Contador_Pantalla = 0; //Se define la variable contador par navegar entre las pantallas disponibles
 int Contador_IE = 0;
+bool Cambio_Opcion_Pantalla = true;
+int Valor_Actual_Pantalla = 0;
 int Pote_Display = 0;
 int BPM_Seleccionado = 15;
 int IE_Seleccionado = 0;
@@ -47,6 +51,8 @@ float Velo_Expiracion_Anterior = 0.0;
 volatile bool Modo_ON = false;     // Inicializacion en ciclo de REPOSO
 volatile bool Cambio_Modo = false; // Indica si hubo un cambio de estado que necesita ser transmitido
 
+unsigned long encoderLastRead;
+
 //*********************************************************************************************************//
 // SETUP
 //*********************************************************************************************************//
@@ -57,7 +63,9 @@ void setup()
   Wire.begin();                     //Se inicializa la comunicación I2C
   lcd.setBacklightPin(3, POSITIVE); //Se enciende la luz del LCD
   lcd.setBacklight(HIGH);
-  lcd.begin(16, 2);                   // Inicializar el LCD con el número de  columnas y filas del LCD
+  lcd.begin(16, 2);
+  pinMode(11, OUTPUT);
+  analogWrite(11, 100);               // Inicializar el LCD con el número de  columnas y filas del LCD
   pinMode(Pulsador_Pantalla, INPUT);  //Le digo que el pin valor, 2 es una entrada digital
   pinMode(Pulsador_Seleccion, INPUT); //Le digo que el pin valor, 3 es una entrada digital
   pinMode(Pulsador_Marcha, INPUT);
@@ -71,9 +79,21 @@ void setup()
 //*********************************************************************************************************//
 void loop()
 {
+  int newValor = myEnc.read();
+  int addEndoderValue = 0;
+  if (newValor != 0 && (millis() - encoderLastRead > (unsigned long)500))
+  {
+    if (newValor < 0)
+      addEndoderValue = -1;
+    else 
+      addEndoderValue = 1;
+    Serial.println(addEndoderValue);
+    Serial.println(newValor);
+    myEnc.write(0);
+    encoderLastRead = millis();
+  }
+
   // Leer valores de Input
-  Pote_Value = analogRead(Pote);                              // Se realiza la lectura del canal analogico A0
-  Pote_Display = map(Pote_Value, 0, 1023, 0, 99);             // Mapeo de la señal analogica entre 0 y 100
   Pulsador_Pantalla_VALUE = digitalRead(Pulsador_Pantalla);   // Lectura del estado del pulsador Pantalla
   Pulsador_Seleccion_VALUE = digitalRead(Pulsador_Seleccion); // Lectura del estado del pulsador Selección
   Pulsador_Marcha_VALUE = digitalRead(Pulsador_Marcha);
@@ -82,111 +102,43 @@ void loop()
   {
     Modo_ON = true;
     Cambio_Modo = true;
-    Serial.print("------ PARADA ------");
+    Serial.print("------ MARCHA ------");
   }
   Pulsador_Marcha_VALUE_Anterior = Pulsador_Marcha_VALUE;
 
   // Movimiento entre pantallas                                                                                            //
-  if (Pulsador_Pantalla_VALUE == HIGH && Pulsador_Pantalla_Anterior_VALUE == LOW)
+  if (Pulsador_Pantalla_VALUE == HIGH & Pulsador_Pantalla_Anterior_VALUE == LOW)
   {
     Contador_Pantalla++;
     lcd.clear();
+    Cambio_Opcion_Pantalla = true;
   }
   Pulsador_Pantalla_Anterior_VALUE = Pulsador_Pantalla_VALUE;
 
   switch (Contador_Pantalla)
   {
   case 0:
-    lcd.setCursor(0, 0);
-    lcd.print("BPM [8-30]"); // Escribimos el Mensaje en el LCD.
-    lcd.setCursor(0, 1);
-    lcd.print("SEL:"); // Escribimos el Mensaje en el LCD.
-    lcd.setCursor(4, 1);
-    lcd.print(Pote_Display); // Escribimos el Mensaje en el LCD.
-    lcd.setCursor(7, 1);
-    lcd.print("SET:");           // Escribimos el Mensaje en el LCD.
-    lcd.print(BPM_Seleccionado); // Escribimos el Mensaje en el LCD.
-
+    if (Cambio_Opcion_Pantalla)
+    {
+      Valor_Actual_Pantalla = BPM_Seleccionado;
+    }
+    NewBpm(addEndoderValue);
     if (Pulsador_Seleccion_VALUE == HIGH)
     {
-      if (Pote_Display < 31 && Pote_Display > 7)
-      {
-        lcd.setCursor(11, 1);
-        lcd.clear();
-        BPM_Seleccionado = Pote_Display;
-        lcd.print(BPM_Seleccionado); // Escribimos el Mensaje en el LCD.
-      }
-      else
-      {
-        lcd.clear();
-        lcd.setCursor(0, 0);
-        lcd.print("Fuera de Rango"); // Escribimos el Mensaje en el LCD.
-        lcd.setCursor(0, 1);
-        lcd.print("Intentelo"); // Escribimos el Mensaje en el LCD.
-        delay(1500);
-        lcd.clear();
-        lcd.setCursor(0, 0);
-        lcd.print("BPM [3-60]"); // Escribimos el Mensaje en el LCD.
-        lcd.setCursor(0, 1);
-        lcd.print("SEL:"); // Escribimos el Mensaje en el LCD.
-        lcd.setCursor(4, 1);
-        lcd.print(Pote_Display); // Escribimos el Mensaje en el LCD.
-        lcd.setCursor(7, 1);
-        lcd.print("SET:");           // Escribimos el Mensaje en el LCD.
-        lcd.print(BPM_Seleccionado); // Escribimos el Mensaje en el LCD.
-      }
+      SetBpm(Valor_Actual_Pantalla);
     }
     break;
 
   case 1:
-    lcd.setCursor(0, 0);
-    lcd.print("I:E [1:1/2/3]"); // Escribimos el Mensaje en el LCD.
-    lcd.setCursor(0, 1);
-    lcd.print("SEL:"); // Escribimos el Mensaje en el LCD.
-    lcd.setCursor(4, 1);
-
-    if (Pulsador_Seleccion_VALUE == HIGH && Pulsador_Seleccion_Anterior_VALUE == LOW)
+    if (Cambio_Opcion_Pantalla)
     {
-      Contador_IE++;
-      lcd.clear();
+      Valor_Actual_Pantalla = Contador_IE;
     }
-    Pulsador_Seleccion_Anterior_VALUE = Pulsador_Seleccion_VALUE;
-
-    switch (Contador_IE)
+    NewIE(addEndoderValue);
+    if (Pulsador_Seleccion_VALUE == HIGH)
     {
-    case 0:
-      lcd.print("1:1"); // Escribimos el Mensaje en el LCD.
-      lcd.setCursor(8, 1);
-      lcd.print("SET:"); // Escribimos el Mensaje en el LCD.
-      lcd.setCursor(12, 1);
-      lcd.print("1:1 "); // Escribimos el Mensaje en el LCD.
-
-      break;
-
-    case 1:
-      lcd.print("1:2"); // Escribimos el Mensaje en el LCD.
-      lcd.setCursor(8, 1);
-      lcd.print("SET:"); // Escribimos el Mensaje en el LCD.
-      lcd.setCursor(12, 1);
-      lcd.print("1:2"); // Escribimos el Mensaje en el LCD.
-
-      break;
-
-    case 2:
-      lcd.print("1:3"); // Escribimos el Mensaje en el LCD.
-      lcd.setCursor(8, 1);
-      lcd.print("SET:"); // Escribimos el Mensaje en el LCD.
-      lcd.setCursor(12, 1);
-      lcd.print("1:3"); // Escribimos el Mensaje en el LCD.
-
-      break;
-
-    case 3:
-      Contador_IE = 0;
-
-      break;
+      SetIE(Valor_Actual_Pantalla);
     }
-
     break;
 
   case 2:
@@ -337,6 +289,8 @@ void loop()
     break;
   }
 
+  Cambio_Opcion_Pantalla = false;
+
   //********************************************************************************************************************************//
   // Calculo de los valores necesarios para el funiconamiento en el ciclo de respiración                                            //
   // int BPM_Seleccionado contiene el valor seleccionado para los ciclos por minuto                                                 //
@@ -384,6 +338,7 @@ void loop()
   if ((Velo_Inspiracion != Velo_Inspiracion_Anterior) || (Velo_Expiracion != Velo_Expiracion_Anterior) || (PMAX_Seleccionado != PMAX_Seleccionado_Anterior) || (PEEP_Seleccionado != PEEP_Seleccionado_Anterior) || (Vtidal_Seleccionado != Vtidal_Seleccionado_Anterior) || Cambio_Modo)
   // (Pulsador_Marcha_VALUE == digitalRead(19))
   {
+    /*
     byte byte1, byte2, byte3, byte4, byte5, byte6, byte7, byte8, byte9, byte10, byte11, byte12, byte13, byte14, byte15, byte16, byte17, byte18;
     unsigned int aux;
 
@@ -464,7 +419,18 @@ void loop()
     Wire.write(byte18);
     Wire.endTransmission(); // Termina a transmissão
   }
-
+*/
+    Serial.print("Vel. Inspiracion: ");
+    Serial.println(Velo_Inspiracion);
+    Serial.print("Vel. Expiracion: ");
+    Serial.println(Velo_Expiracion);
+    Serial.print("PMAX: ");
+    Serial.println(PMAX_Seleccionado);
+    Serial.print("PEEP: ");
+    Serial.println(PEEP_Seleccionado);
+    Serial.print("Vtidal: ");
+    Serial.println(Vtidal_Seleccionado);
+  }
   Velo_Inspiracion_Anterior = Velo_Inspiracion;
   Velo_Expiracion_Anterior = Velo_Expiracion;
   PMAX_Seleccionado_Anterior = PMAX_Seleccionado;
@@ -489,4 +455,93 @@ void Pulsador_Parada()
   Modo_ON = false;
   Cambio_Modo = true;
   Serial.print("------ PARADA ------");
+}
+
+//****************************************************************************************************************
+// Funciones control valores
+//****************************************************************************************************************
+
+// BPM
+#define BmpMinValue 8
+#define BmpMaxValue 30
+void NewBpm(int addValue)
+{
+  if (Valor_Actual_Pantalla + addValue > BmpMaxValue || Valor_Actual_Pantalla + addValue < BmpMinValue)
+  {
+    addValue = 0;
+  }
+
+  Valor_Actual_Pantalla += addValue;
+  lcd.setCursor(0, 0);
+  lcd.print("BPM [8-30]"); // Escribimos el Mensaje en el LCD.
+  lcd.setCursor(0, 1);
+  lcd.print("SEL:"); // Escribimos el Mensaje en el LCD.
+  lcd.setCursor(4, 1);
+  lcd.print("  ");
+  lcd.setCursor(4, 1);
+  lcd.print(Valor_Actual_Pantalla); // Escribimos el Mensaje en el LCD.
+  lcd.setCursor(7, 1);
+  lcd.print("SET:");           // Escribimos el Mensaje en el LCD.
+  lcd.print(BPM_Seleccionado); // Escribimos el Mensaje en el LCD.
+}
+
+void SetBpm(int value)
+{
+  if (value >= BmpMinValue && value <= BmpMaxValue)
+  {
+    lcd.setCursor(11, 1);
+    lcd.clear();
+    BPM_Seleccionado = value;
+    lcd.print(BPM_Seleccionado); // Escribimos el Mensaje en el LCD.
+  }
+  else
+  {
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("Fuera de Rango"); // Escribimos el Mensaje en el LCD.
+    lcd.setCursor(0, 1);
+    lcd.print("Intentelo"); // Escribimos el Mensaje en el LCD.
+    delay(1500);
+    lcd.clear();
+  }
+}
+
+// IE
+void NewIE(int value)
+{
+  lcd.setCursor(0, 0);
+  lcd.print("I:E [1:1/2/3]"); // Escribimos el Mensaje en el LCD.
+  lcd.setCursor(0, 1);
+  lcd.print("SEL:"); // Escribimos el Mensaje en el LCD.
+  lcd.setCursor(4, 1);
+
+  Valor_Actual_Pantalla = (unsigned int)((Valor_Actual_Pantalla + value) % 3);
+  switch (Valor_Actual_Pantalla)
+  {
+  case 0:
+    lcd.print("1:1"); // Escribimos el Mensaje en el LCD.
+    break;
+  case 1:
+    lcd.print("1:2"); // Escribimos el Mensaje en el LCD.
+    break;
+
+  case 2:
+    lcd.print("1:3"); // Escribimos el Mensaje en el LCD.
+    break;
+  case 3:
+    Contador_IE = 0;
+    break;
+  }
+  lcd.setCursor(8, 1);
+  lcd.print("SET:"); // Escribimos el Mensaje en el LCD.
+  lcd.setCursor(12, 1);
+  lcd.print("1:" + String(Contador_IE + 1)); // Escribimos el Mensaje en el LCD.
+}
+
+void SetIE(int value)
+{
+  if (value >= 0 && value <= 3)
+  {
+    Contador_IE = value;
+  }
 }
