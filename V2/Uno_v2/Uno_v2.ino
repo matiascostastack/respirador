@@ -334,39 +334,36 @@ void encoder()
 //**********************************************************************************************************************************************//
 double Presion()
 {
-    double Aux = 0;
-    for (int p = 0; p < 10; p++)
-    {
-        Aux = Aux + (float(analogRead(A0) * 5.0 / 1023.0)); //Leo la entrada analogica que tiene conectada el sensor de presión
+    float Aux = 0.0;
+    int p = 0;
+    for (p = 0; p < 10; p++)
+        {
+        Aux = Aux + (float(analogRead(A0) *5.0 / 1023.0)); //Leo la entrada analogica que tiene conectada el sensor de presión
         delay(5);
     }
-    Vout = Aux / 10.0;
-    PcmH2o = ((Vout - 0.04 * Vs + 0.01) / (0.09 * Vs)) * 10.1972; //Se multiplica por el equivalente para la conversion a cmH20
+    Vout = Aux/10.0;
+    PcmH2o_Grafica = (((Vout2 - 0.04 * Vs + 0.20) / (0.09 * Vs))) * 10,1972.0; //Se multiplica por el equivalente para la conversion a cmH20
     return PcmH2o;
 }
 
 void ChequeoPIP()
 {
-    double pipSeteada = 100;
     Presion_PIP = Presion();
     delay(100);
     Presion_Plateau = Presion();
-    if (Presion_PIP > pipSeteada)
+    if (Presion_PIP > PMAX)
     {
-        stepper.setCurrentPosition(0);
-        stepper.runToPosition();
+        IrAlInicio();
         CicloActual = ALARMA_PIP;
     }
 }
 
 void ChequeoPEEP()
 {
-    double peepSeteada = 100;
     Presion_PEEP = Presion();
-    if (Presion_PIP > peepSeteada)
+    if (Presion_PIP > PMAX)
     {
-        stepper.setCurrentPosition(0);
-        stepper.runToPosition();
+        IrAlInicio();
         CicloActual = ALARMA_PEEP;
     }
 }
@@ -381,16 +378,17 @@ void PresionGraficaInterrupcion()
 
 void Presion_Grafica()
 {
-    double Aux2 = 0;
-    for (int g = 0; g < 10; g++)
-    {
-        Aux2 = Aux2 + (float(analogRead(A0) * 5.0 / 1023.0)); //Leo la entrada analogica que tiene conectada el sensor de presión
+    float Aux2 = 0.0;
+    int g = 0;
+    for (g = 0; g < 10; g++)
+        {
+        Aux2 = Aux2 + (float(analogRead(A0) *5.0 / 1023.0)); //Leo la entrada analogica que tiene conectada el sensor de presión
         delay(5);
     }
-    Vout2 = Aux2 / 10.0;
-    PcmH2o_Grafica = ((Vout2 - 0.04 * Vs + 0.01) / (0.09 * Vs)) * 10.1972; //Se multiplica por el equivalente para la conversion a cmH20
-    Serial.print("Presion del sistema:");
-    Serial.println(PcmH2o);
+    Vout2 = Aux2/10.0;
+    PcmH2o_Grafica = (((Vout2 - 0.04 * Vs + 0.20) / (0.09 * Vs))) * 10,1972.0; //Se multiplica por el equivalente para la conversion a cmH20
+    Serial.print("Presion del sistema:"); 
+    Serial.println(PcmH2o_Grafica);
 }
 
 //**********************************************************************************************************************************************//
@@ -398,5 +396,12 @@ void Presion_Grafica()
 //**********************************************************************************************************************************************//
 void IrAlInicio()
 {
-
+    digitalWrite(dirPin, LOW);
+    for (int i = Pasos_Actuales; i < Pasos_Avance; i++) //Backward 1600 steps
+    {
+      digitalWrite(stepPin, HIGH);
+      delayMicroseconds(Velo_Motor_Exp / 2.0);
+      digitalWrite(stepPin, LOW);
+      delayMicroseconds(Velo_Motor_Exp / 2.0);
+    }
 }
