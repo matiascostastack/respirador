@@ -239,6 +239,7 @@ void loop()
         if (digitalRead(Led_Marcha) == HIGH)
         {
             IrAlInicio();
+            CicloActual = INSPIRACION;
         }
         digitalWrite(Led_Marcha, LOW);
     }
