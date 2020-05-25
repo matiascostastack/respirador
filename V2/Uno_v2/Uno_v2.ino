@@ -236,6 +236,10 @@ void loop()
     }
     else
     {
+        if (digitalRead(Led_Marcha) == HIGH)
+        {
+            IrAlInicio();
+        }
         digitalWrite(Led_Marcha, LOW);
     }
 }
@@ -404,4 +408,5 @@ void IrAlInicio()
       digitalWrite(stepPin, LOW);
       delayMicroseconds(Velo_Motor_Exp / 2.0);
     }
+    Pasos_Actuales = 0;
 }
