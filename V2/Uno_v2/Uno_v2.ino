@@ -1,6 +1,7 @@
 #include <TimerOne.h>
 #include <AccelStepper.h>
 #include <Wire.h>
+#include <Encoder.h>
 
 typedef enum TipoDeCiclo
 {
@@ -32,6 +33,7 @@ int Vtidal = 0;
 #define B 4                                           //variable B del encoder a pin digital 4 (CLK en modulo)
 volatile int Posicion = 100;                          // variable Posicion con valor inicial de 0 y definida como global al ser usada en loop e ISR (encoder)
 volatile unsigned long encoderUltimaInterrupcion = 0; // variable static con ultimo valor de tiempo de interrupcion
+Encoder myEncoder(2, 4);
 
 // Sensor Home
 #define Sensor_Home 10 // Se define el pin 9 como la conexion del sensor de Home (optoacoplador)
@@ -152,6 +154,7 @@ void setup()
 
     digitalWrite(Led_Home, LOW);
     stepper.setCurrentPosition(0);
+    myEncoder.write(0);                 // set the encoder position to 0
     Serial.println("Homing Completed"); //Lo utilizo para visualizar el dato en el RS232
 
     digitalWrite(dirPin, HIGH);
@@ -170,11 +173,15 @@ void setup()
 
 void loop()
 {
+    Posicion = myEncoder.read(); // read position
+    //Serial.print("Posicion:"); // print the position
+    //Serial.println(Posicion);
+
     if (Modo_ON)
     {
         switch (AlarmaActual)
         {
-        case ALARMA_PIP:    // No debería entrar en esta opcion pero por las dudas se contempla
+        case ALARMA_PIP: // No debería entrar en esta opcion pero por las dudas se contempla
             AlarmaContinua();
             Modo_ON = false;
             break;
@@ -274,11 +281,11 @@ void loop()
         else
         {
             SilenciarAlarma();
-            Pasos_Avance = 0;   // Setear el valor en cero para que se calculen los parametros cuando se reactiva
 
             if (digitalRead(Led_Marcha) == HIGH)
                 IrAlInicio();
 
+            Pasos_Avance = 0; // Setear el valor en cero para que se calculen los parametros cuando se reactiva
             digitalWrite(Led_Marcha, LOW);
         }
     }
