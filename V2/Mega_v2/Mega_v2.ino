@@ -81,11 +81,11 @@ void loop()
 {
   int newValor = myEnc.read();
   int addEndoderValue = 0;
-  if (newValor != 0 && (millis() - encoderLastRead > (unsigned long)500))
+  if (newValor != 0 && newValor % 4 == 0)
   {
     if (newValor < 0)
       addEndoderValue = -1;
-    else 
+    else
       addEndoderValue = 1;
     Serial.println(addEndoderValue);
     Serial.println(newValor);
@@ -121,6 +121,7 @@ void loop()
     if (Cambio_Opcion_Pantalla)
     {
       Valor_Actual_Pantalla = BPM_Seleccionado;
+      Cambio_Opcion_Pantalla = false;
     }
     NewBpm(addEndoderValue);
     if (Pulsador_Seleccion_VALUE == HIGH)
@@ -133,6 +134,7 @@ void loop()
     if (Cambio_Opcion_Pantalla)
     {
       Valor_Actual_Pantalla = Contador_IE;
+      Cambio_Opcion_Pantalla = false;
     }
     NewIE(addEndoderValue);
     if (Pulsador_Seleccion_VALUE == HIGH)
@@ -142,129 +144,41 @@ void loop()
     break;
 
   case 2:
-    lcd.setCursor(0, 0);
-    lcd.print("PMax [3-40cmH2o]"); // Escribimos el Mensaje en el LCD.
-    lcd.setCursor(0, 1);
-    lcd.print("SEL:"); // Escribimos el Mensaje en el LCD.
-    lcd.setCursor(4, 1);
-    lcd.print(Pote_Display); // Escribimos el Mensaje en el LCD.
-    lcd.setCursor(7, 1);
-    lcd.print("SET:");            // Escribimos el Mensaje en el LCD.
-    lcd.print(PMAX_Seleccionado); // Escribimos el Mensaje en el LCD.
-
+    if (Cambio_Opcion_Pantalla)
+    {
+      Valor_Actual_Pantalla = PMAX_Seleccionado;
+      Cambio_Opcion_Pantalla = false;
+    }
+    NewPmax(addEndoderValue);
     if (Pulsador_Seleccion_VALUE == HIGH)
     {
-
-      if (Pote_Display < 40 && Pote_Display > 0)
-      {
-        lcd.setCursor(11, 1);
-        lcd.clear();
-        PMAX_Seleccionado = Pote_Display;
-        lcd.print(PMAX_Seleccionado); // Escribimos el Mensaje en el LCD.
-      }
-      else
-      {
-        lcd.clear();
-        lcd.setCursor(0, 0);
-        lcd.print("Fuera de Rango"); // Escribimos el Mensaje en el LCD.
-        lcd.setCursor(0, 1);
-        lcd.print("Intentelo"); // Escribimos el Mensaje en el LCD.
-        delay(1500);
-        lcd.clear();
-        lcd.setCursor(0, 0);
-        lcd.print("PMax [3-40cmH2o]"); // Escribimos el Mensaje en el LCD.
-        lcd.setCursor(0, 1);
-        lcd.print("SEL:"); // Escribimos el Mensaje en el LCD.
-        lcd.setCursor(4, 1);
-        lcd.print(Pote_Display); // Escribimos el Mensaje en el LCD.
-        lcd.setCursor(7, 1);
-        lcd.print("SET:");            // Escribimos el Mensaje en el LCD.
-        lcd.print(PMAX_Seleccionado); // Escribimos el Mensaje en el LCD.
-      }
+      SetPmax(Valor_Actual_Pantalla);
     }
     break;
 
   case 3:
-    lcd.setCursor(0, 0);
-    lcd.print("PEEP [0-10cmH2o]"); // Escribimos el Mensaje en el LCD.
-    lcd.setCursor(0, 1);
-    lcd.print("SEL:"); // Escribimos el Mensaje en el LCD.
-    lcd.setCursor(4, 1);
-    lcd.print(Pote_Display); // Escribimos el Mensaje en el LCD.
-    lcd.setCursor(7, 1);
-    lcd.print("SET:");            // Escribimos el Mensaje en el LCD.
-    lcd.print(PEEP_Seleccionado); // Escribimos el Mensaje en el LCD.
-
+    if (Cambio_Opcion_Pantalla)
+    {
+      Valor_Actual_Pantalla = PEEP_Seleccionado;
+      Cambio_Opcion_Pantalla = false;
+    }
+    NewPeep(addEndoderValue);
     if (Pulsador_Seleccion_VALUE == HIGH)
     {
-      if (Pote_Display < 10 && Pote_Display > 0)
-      {
-        lcd.setCursor(11, 1);
-        lcd.clear();
-        PEEP_Seleccionado = Pote_Display;
-        lcd.print(PEEP_Seleccionado); // Escribimos el Mensaje en el LCD.
-      }
-      else
-      {
-        lcd.clear();
-        lcd.setCursor(0, 0);
-        lcd.print("Fuera de Rango"); // Escribimos el Mensaje en el LCD.
-        lcd.setCursor(0, 1);
-        lcd.print("Intentelo"); // Escribimos el Mensaje en el LCD.
-        delay(1500);
-        lcd.clear();
-        lcd.setCursor(0, 0);
-        lcd.print("PEEP [0-10cmH2o]"); // Escribimos el Mensaje en el LCD.
-        lcd.setCursor(0, 1);
-        lcd.print("SEL:"); // Escribimos el Mensaje en el LCD.
-        lcd.setCursor(4, 1);
-        lcd.print(Pote_Display); // Escribimos el Mensaje en el LCD.
-        lcd.setCursor(7, 1);
-        lcd.print("SET:");            // Escribimos el Mensaje en el LCD.
-        lcd.print(PEEP_Seleccionado); // Escribimos el Mensaje en el LCD.
-      }
+      SetPeep(Valor_Actual_Pantalla);
     }
     break;
 
   case 4:
-    lcd.setCursor(0, 0);
-    lcd.print("Vtidal [0-100%]"); // Escribimos el Mensaje en el LCD.
-    lcd.setCursor(0, 1);
-    lcd.print("SEL:"); // Escribimos el Mensaje en el LCD.
-    lcd.setCursor(4, 1);
-    lcd.print(Pote_Display); // Escribimos el Mensaje en el LCD.
-    lcd.setCursor(7, 1);
-    lcd.print("SET:");              // Escribimos el Mensaje en el LCD.
-    lcd.print(Vtidal_Seleccionado); // Escribimos el Mensaje en el LCD.
-
+    if (Cambio_Opcion_Pantalla)
+    {
+      Valor_Actual_Pantalla = Vtidal_Seleccionado;
+      Cambio_Opcion_Pantalla = false;
+    }
+    NewVtidal(addEndoderValue);
     if (Pulsador_Seleccion_VALUE == HIGH)
     {
-      if (Pote_Display < 101 && Pote_Display > 0)
-      {
-        lcd.setCursor(11, 1);
-        lcd.clear();
-        Vtidal_Seleccionado = Pote_Display;
-        lcd.print(Vtidal_Seleccionado); // Escribimos el Mensaje en el LCD.
-      }
-      else
-      {
-        lcd.clear();
-        lcd.setCursor(0, 0);
-        lcd.print("Fuera de Rango"); // Escribimos el Mensaje en el LCD.
-        lcd.setCursor(0, 1);
-        lcd.print("Intentelo"); // Escribimos el Mensaje en el LCD.
-        delay(1500);
-        lcd.clear();
-        lcd.setCursor(0, 0);
-        lcd.print("Volumen TIDAL [0-1500ml]"); // Escribimos el Mensaje en el LCD.
-        lcd.setCursor(0, 1);
-        lcd.print("SEL:"); // Escribimos el Mensaje en el LCD.
-        lcd.setCursor(4, 1);
-        lcd.print(Pote_Display); // Escribimos el Mensaje en el LCD.
-        lcd.setCursor(7, 1);
-        lcd.print("SET:");              // Escribimos el Mensaje en el LCD.
-        lcd.print(Vtidal_Seleccionado); // Escribimos el Mensaje en el LCD.
-      }
+      SetVtidal(Valor_Actual_Pantalla);
     }
     break;
 
@@ -283,13 +197,11 @@ void loop()
     lcd.setCursor(8, 1);
     lcd.print(Pulsador_Seleccion_VALUE); // Escribimos el Mensaje en el LCD.
     break;
+
   case 6:
     Contador_Pantalla = 0;
-
     break;
   }
-
-  Cambio_Opcion_Pantalla = false;
 
   //********************************************************************************************************************************//
   // Calculo de los valores necesarios para el funiconamiento en el ciclo de respiración                                            //
@@ -460,27 +372,38 @@ void Pulsador_Parada()
 //****************************************************************************************************************
 // Funciones control valores
 //****************************************************************************************************************
+// Error de rango
+void ImprimirErrorDeRango()
+{
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Fuera de Rango"); // Escribimos el Mensaje en el LCD.
+  lcd.setCursor(0, 1);
+  lcd.print("Intentelo"); // Escribimos el Mensaje en el LCD.
+  delay(1500);
+  lcd.clear();
+}
 
-// BPM
+// BPM  ****************************************************************************************************************
 #define BmpMinValue 8
 #define BmpMaxValue 30
-void NewBpm(int addValue)
+void NewBpm(int value)
 {
-  if (Valor_Actual_Pantalla + addValue > BmpMaxValue || Valor_Actual_Pantalla + addValue < BmpMinValue)
+  if (Valor_Actual_Pantalla + value > BmpMaxValue || Valor_Actual_Pantalla + value < BmpMinValue)
   {
-    addValue = 0;
+    value = 0;
   }
 
-  Valor_Actual_Pantalla += addValue;
+  Valor_Actual_Pantalla += value;
   lcd.setCursor(0, 0);
   lcd.print("BPM [8-30]"); // Escribimos el Mensaje en el LCD.
   lcd.setCursor(0, 1);
   lcd.print("SEL:"); // Escribimos el Mensaje en el LCD.
   lcd.setCursor(4, 1);
-  lcd.print("  ");
+  lcd.print("   ");
   lcd.setCursor(4, 1);
   lcd.print(Valor_Actual_Pantalla); // Escribimos el Mensaje en el LCD.
-  lcd.setCursor(7, 1);
+  lcd.setCursor(9, 1);
   lcd.print("SET:");           // Escribimos el Mensaje en el LCD.
   lcd.print(BPM_Seleccionado); // Escribimos el Mensaje en el LCD.
 }
@@ -496,17 +419,11 @@ void SetBpm(int value)
   }
   else
   {
-    lcd.clear();
-    lcd.setCursor(0, 0);
-    lcd.print("Fuera de Rango"); // Escribimos el Mensaje en el LCD.
-    lcd.setCursor(0, 1);
-    lcd.print("Intentelo"); // Escribimos el Mensaje en el LCD.
-    delay(1500);
-    lcd.clear();
+    ImprimirErrorDeRango();
   }
 }
 
-// IE
+// IE ****************************************************************************************************************
 void NewIE(int value)
 {
   lcd.setCursor(0, 0);
@@ -515,7 +432,7 @@ void NewIE(int value)
   lcd.print("SEL:"); // Escribimos el Mensaje en el LCD.
   lcd.setCursor(4, 1);
 
-  Valor_Actual_Pantalla = (unsigned int)((Valor_Actual_Pantalla + value) % 3);
+  Valor_Actual_Pantalla = ((Valor_Actual_Pantalla + abs(value)) % 3);
   switch (Valor_Actual_Pantalla)
   {
   case 0:
@@ -524,12 +441,8 @@ void NewIE(int value)
   case 1:
     lcd.print("1:2"); // Escribimos el Mensaje en el LCD.
     break;
-
   case 2:
     lcd.print("1:3"); // Escribimos el Mensaje en el LCD.
-    break;
-  case 3:
-    Contador_IE = 0;
     break;
   }
   lcd.setCursor(8, 1);
@@ -543,5 +456,125 @@ void SetIE(int value)
   if (value >= 0 && value <= 3)
   {
     Contador_IE = value;
+  }
+}
+
+// P Max  ****************************************************************************************************************
+#define PmaxMinValue 3
+#define PmaxMaxValue 40
+void NewPmax(int value)
+{
+  if (Valor_Actual_Pantalla + value > PmaxMaxValue || Valor_Actual_Pantalla + value < PmaxMinValue)
+  {
+    value = 0;
+  }
+
+  Valor_Actual_Pantalla += value;
+
+  lcd.setCursor(0, 0);
+  lcd.print("PMax [" + String(PmaxMinValue) + "-" + PmaxMaxValue + "cmH2o]"); // Escribimos el Mensaje en el LCD.
+  lcd.setCursor(0, 1);
+  lcd.print("SEL:"); // Escribimos el Mensaje en el LCD.
+  lcd.setCursor(4, 1);
+  lcd.print("   ");
+  lcd.setCursor(4, 1);
+  lcd.print(Valor_Actual_Pantalla); // Escribimos el Mensaje en el LCD.
+  lcd.setCursor(9, 1);
+  lcd.print("SET:");            // Escribimos el Mensaje en el LCD.
+  lcd.print(PMAX_Seleccionado); // Escribimos el Mensaje en el LCD.
+}
+
+void SetPmax(int value)
+{
+  if (value >= PmaxMinValue && value <= PmaxMaxValue)
+  {
+    lcd.setCursor(11, 1);
+    lcd.clear();
+    PMAX_Seleccionado = value;
+    lcd.print(PMAX_Seleccionado); // Escribimos el Mensaje en el LCD.
+  }
+  else
+  {
+    ImprimirErrorDeRango();
+  }
+}
+
+// PEEP  ****************************************************************************************************************
+#define PeepMinValue 0
+#define PeepMaxValue 10
+void NewPeep(int value)
+{
+  if (Valor_Actual_Pantalla + value > PeepMaxValue || Valor_Actual_Pantalla + value < PeepMinValue)
+  {
+    value = 0;
+  }
+
+  Valor_Actual_Pantalla += value;
+
+  lcd.setCursor(0, 0);
+  lcd.print("PEEP [" + String(PeepMinValue) + "-" + PeepMaxValue + "cmH2o]"); // Escribimos el Mensaje en el LCD.
+  lcd.setCursor(0, 1);
+  lcd.print("SEL:"); // Escribimos el Mensaje en el LCD.
+  lcd.setCursor(4, 1);
+  lcd.print("   ");
+  lcd.setCursor(4, 1);
+  lcd.print(Valor_Actual_Pantalla); // Escribimos el Mensaje en el LCD.
+  lcd.setCursor(9, 1);
+  lcd.print("SET:");            // Escribimos el Mensaje en el LCD.
+  lcd.print(PEEP_Seleccionado); // Escribimos el Mensaje en el LCD.
+}
+
+void SetPeep(int value)
+{
+  if (value >= PeepMinValue && value <= PeepMaxValue)
+  {
+    lcd.setCursor(11, 1);
+    lcd.clear();
+    PEEP_Seleccionado = value;
+    lcd.print(PEEP_Seleccionado); // Escribimos el Mensaje en el LCD.
+  }
+  else
+  {
+    ImprimirErrorDeRango();
+  }
+}
+
+// Vtidal  ****************************************************************************************************************
+#define VtidalMinValue 0
+#define VtidalMaxValue 100
+void NewVtidal(int value)
+{
+  if (Valor_Actual_Pantalla + value > VtidalMaxValue || Valor_Actual_Pantalla + value < VtidalMinValue)
+  {
+    value = 0;
+  }
+
+  Valor_Actual_Pantalla += value;
+
+  lcd.setCursor(0, 0);
+  lcd.print("V.TIDAL [" + String(VtidalMinValue) + "-" + VtidalMaxValue + "%]"); // Escribimos el Mensaje en el LCD.
+  lcd.setCursor(0, 1);
+  lcd.print("SEL:"); // Escribimos el Mensaje en el LCD.
+  lcd.setCursor(4, 1);
+  lcd.print("   ");
+  lcd.setCursor(4, 1);
+  lcd.print(Valor_Actual_Pantalla); // Escribimos el Mensaje en el LCD.
+  lcd.setCursor(9, 1);
+  lcd.print("SET:");            // Escribimos el Mensaje en el LCD.
+  lcd.print(Vtidal_Seleccionado); // Escribimos el Mensaje en el LCD.
+}
+
+void SetVtidal(int value)
+{
+  if (value >= VtidalMinValue && value <= VtidalMaxValue)
+  {
+    lcd.setCursor(11, 1);
+    lcd.clear();
+    Vtidal_Seleccionado = value;
+    lcd.print(Vtidal_Seleccionado); // Escribimos el Mensaje en el LCD.
+  }
+  else
+  {
+    ImprimirErrorDeRango();
   }
 }
