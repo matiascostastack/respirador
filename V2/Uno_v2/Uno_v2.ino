@@ -50,7 +50,7 @@ AccelStepper stepper = AccelStepper(motorInterfaceType, stepPin, dirPin);
 #define Led_Marcha 11
 
 // Alarmas
-#define Buzzer_Pin 20
+#define Buzzer_Pin 4
 #define Tono_Alarma 250
 #define Tiempo_Alarma 1000
 bool Alarma_ON = false;
