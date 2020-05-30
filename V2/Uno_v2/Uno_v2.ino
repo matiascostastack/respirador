@@ -14,6 +14,7 @@ typedef enum TipoDeAlarma
 {
     ALARMA_PIP,
     ALARMA_PEEP,
+    ALARMA_MECANICA,
     SIN_ALARMA
 };
 
@@ -67,17 +68,24 @@ float Angulo_Pulso = 0.0;
 int Pasos_Actuales = 0;
 
 double Vout = 0.0;
-double Vs = 5.0;
+double Vs = 4.5;
+double Vs2 = 4.6;
 double PcmH2o = 0.0;
 double Vout2 = 0.0;
-double PcmH2o_Grafica = 0.0;
+double Vout3 = 0.0;
+double P1 = 0.0;
+double P1_1 = 0.0;
+double P2 = 0.0;
 
 double Presion_PIP = 0.0;
 double Presion_Plateau = 0.0;
 double Presion_PEEP = 0.0;
 
-// Flag de Interrupciones
-bool Presion_Grafica_Interrupcion_Flag = false;
+// Timers para Graficos
+unsigned long Presion_Grafica_Ultimo = 0;
+unsigned long Volumen_Grafica_Ultimo = 0;
+unsigned long Presion_Grafica_Intervalo_Milli = 100;
+unsigned long Volumen_Grafica_Intervalo_Milli = 100;
 
 // Auxiliares
 unsigned long Tiempo_Ciclo = 0;
@@ -98,7 +106,7 @@ void setup()
     delay(5);
     pinMode(Led_Home, OUTPUT);
     pinMode(Led_Marcha, OUTPUT);
-    attachInterrupt(digitalPinToInterrupt(A), encoder, FALLING); // interrupcion sobre pin A con funcion ISR encoder y modo LOW
+   // attachInterrupt(digitalPinToInterrupt(A), encoder, FALLING); // interrupcion sobre pin A con funcion ISR encoder y modo LOW
                                                                  //attachInterrupt(digitalPinToInterrupt(B), encoder, LOW);    // interrupcion sobre pin A con funcion ISR encoder y modo LOW
                                                                  // Serial.println("Listo");                                    // imprime en monitor serial Listo
     Wire.begin(4);                                               // Inicia como esclavo con dirección 4 en la comunicación I2C
@@ -108,8 +116,10 @@ void setup()
     // Tomamos valores de presion del sistema con una interrupcion para graficar dicha presion
     //*********************************************************************************************************//
 
-    Timer1.initialize(250000); // Dispara cada 100 ms
-    Timer1.attachInterrupt(Presion_Grafica);
+    //Timer1.initialize(250000); // Dispara cada 100 ms
+    //Timer1.attachInterrupt(Presion_Grafica);
+   // Timer1.initialize(250000); // Dispara cada 100 ms
+   // Timer1.attachInterrupt(Volumen_Grafica);
 
     //************************************************************************************************//
     // Inicializacion de la posicion de los brazos. Al encender se irán a posición Home
@@ -174,7 +184,7 @@ void setup()
 void loop()
 {
     Posicion = myEncoder.read(); // read position
-    //Serial.print("Posicion:"); // print the position
+   // Serial.print("Posicion:"); // print the position
     //Serial.println(Posicion);
 
     if (Modo_ON)
@@ -201,11 +211,17 @@ void loop()
 
         digitalWrite(Led_Marcha, HIGH);
 
-        // Atender flags de Interrupciones
-        if (Presion_Grafica_Interrupcion_Flag)
+        // Chequear Intervalos para graficos
+        if ((unsigned long)millis() - Presion_Grafica_Ultimo > Presion_Grafica_Intervalo_Milli)
         {
             Presion_Grafica();
-            Presion_Grafica_Interrupcion_Flag = false;
+            Presion_Grafica_Ultimo = millis();
+        }
+
+        if ((unsigned long)millis() - Volumen_Grafica_Ultimo > Volumen_Grafica_Intervalo_Milli)
+        {
+            Volumen_Grafica();
+            Volumen_Grafica_Ultimo = millis();
         }
 
         // Manejar los ciclos
@@ -396,20 +412,22 @@ void encoder()
 }
 
 //**********************************************************************************************************************************************//
-// Funcion para la obtencion de los valores de presion en los puntos de la curva necesarios.
+// Funcion para la obtencion de los valores de presion en los puntos de la curva necesarios. Se toma el valor y se compara con los datos cargados para alarmas
 //**********************************************************************************************************************************************//
 double Presion()
 {
     float Aux = 0.0;
     int p = 0;
+    float AP = 0.01; //Error en la presión
     for (p = 0; p < 10; p++)
     {
         Aux = Aux + (float(analogRead(A0) * 5.0 / 1023.0)); //Leo la entrada analogica que tiene conectada el sensor de presión
         delay(5);
     }
     Vout = Aux / 10.0;
-    PcmH2o_Grafica = (((Vout2 - 0.04 * Vs + 0.20) / (0.09 * Vs))) * 10, 1972.0; //Se multiplica por el equivalente para la conversion a cmH20
-    return PcmH2o;
+    P1 = ((Vout - 0.04 * Vs) / (0.09 * Vs) + AP) * 10.1972; // 10.1972Se multiplica por el equivalente para la conversion a cmH20
+    P1 =  1.002 * P1 + 0.182;    // Regresion lineal obtenida de los valores experimentales. Ver tabla en excel
+    return P1;
 }
 
 void ChequeoPIP()
@@ -440,25 +458,73 @@ void ChequeoPEEP()
 //**********************************************************************************************************************************************//
 // Funcion para la obtencion de una grafica de presion. Se desactiva luego de las pruebas
 //**********************************************************************************************************************************************//
-void PresionGraficaInterrupcion()
-{
-    Presion_Grafica_Interrupcion_Flag = true;
-}
-
 void Presion_Grafica()
 {
     float Aux2 = 0.0;
     int g = 0;
+    float AP = 0.01; //Error en la presión
     for (g = 0; g < 10; g++)
     {
         Aux2 = Aux2 + (float(analogRead(A0) * 5.0 / 1023.0)); //Leo la entrada analogica que tiene conectada el sensor de presión
         delay(5);
     }
     Vout2 = Aux2 / 10.0;
-    PcmH2o_Grafica = (((Vout2 - 0.04 * Vs + 0.20) / (0.09 * Vs))) * 10, 1972.0; //Se multiplica por el equivalente para la conversion a cmH20
-    Serial.print("Presion del sistema:");
-    Serial.println(PcmH2o_Grafica);
+    P1 = ((Vout2 - 0.04 * Vs) / (0.09 * Vs) + AP) * 10.1972; // 10.1972Se multiplica por el equivalente para la conversion a cmH20
+    P1 =  1.002 * P1 + 0.182;    // Regresion lineal obtenida de los valores experimentales. Ver tabla en excel
+    P1_1 =  (1.002 * P1 + 0.182) * ( 1000.0/10.1972); // Presion en Pasacales para los calculos de caudal en bernoulli
+   // Serial.print("Presion del sistema en CmH2O:");
+   // Serial.println(P1);
+    Serial.print("Presion P1 [Pascales]:");
+   Serial.println(P1_1);
 }
+
+void Volumen_Grafica()
+{
+    float Aux3 = 0.0;
+    int e = 0;
+    float AP2 = 0.01; //Error en la presión
+    for (e = 0; e < 10; e++)
+    {
+        Aux3 = Aux3 + (float(analogRead(A1) * 5.0 / 1023.0)); //Leo la entrada analogica que tiene conectada el sensor de presión
+        delay(5);
+    }
+    Vout3 = Aux3 / 10.0;
+    P2 = ((Vout3 - 0.04 * Vs2) / (0.09 * Vs2) + AP2) * 1000.0; // Se multuplica x 1000 para obtener el valor en Pascales, unidad que necesitamos en la ecuacion de bernoulli
+  //  En volumen vamos a trabajar las presiones en Pascales (El sensor da el valor en KPA hay que convertir o multiplicar por 1000 para tener el mismo en pascales)
+    P2 =  1.017 * P2 - 0.474;    // Regresion lineal obtenida de los valores experimentales. Ver tabla en excel
+    Serial.print("Presion P2:[Pasacales]");
+    Serial.println(P2);
+}
+
+void Caudal ()
+{
+float r1 = 0.15; // Radio r1 en metros
+float r2 = 0.10; // Radio r2 en metros
+float rho = 1.225; // Densidad del aire 1.225 Kg/m3
+float num = 0.0;
+float den = 0.0;
+float V1 = 0.0; // en m/s
+float Q = 0.0; // l/s o m3/s
+float pi = 3.14159265;
+float delta_P = 0.0;
+float A1 = 0.0;
+float A2 = 0.0;
+
+// P1_1 y P2 los sensores la dan en KPascales. ejemplo si P1_1-P2 = 20Kpa=> 20Kpa = 20KN/m2 *1000 N/ KN = 20000 N/m2 = 20000 Kg m/s2 Ose aque el valor lo multiplico x 1000 para tenerlo en Kg m/s2
+//P1_1 = 100.0;
+//P2 = 80.0;
+A1 = pi * pow(r1,2);
+A2 = pi * pow(r2,2);
+delta_P = (P1_1 - P2) * 1000; // Tengo el valor en Kg m/s2
+num = 2 * delta_P; // Valor de numerador para obtner la velocidad, 
+den = rho * (pow(A1,2) - pow(A2,2)); // Valor del denominador para obtener la velocidad. , queda sin unidad
+V1 = A2 * pow((num/den),0.5); // Calculo la velocidad 1 en m/s
+Q = A1 * V1; // Calculo el caudal
+Serial.print("Caudal:");
+Serial.println(Q);
+  
+}
+
 
 //**********************************************************************************************************************************************//
 // Funciones de posicionamiento de los brazos
@@ -516,4 +582,17 @@ void SilenciarAlarma()
 void InformarAlarma(TipoDeAlarma alarma)
 {
     // Comunicar al controlador de pantalla el tipo de alarma
+    switch (alarma)
+    {
+    case ALARMA_PEEP:
+        break;
+    case ALARMA_PIP:
+        break;
+    case ALARMA_MECANICA:
+        break;
+    case SIN_ALARMA:
+        break;
+    default:
+        break;
+    }
 }
