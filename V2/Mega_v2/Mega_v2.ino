@@ -1,6 +1,6 @@
 #include <Wire.h>
 #include <LCD.h>
-#include <LiquidCrystal.h>
+#include <LiquidCrystal_I2C.h>
 #include <Encoder.h>
 
 //#include <LiquidCrystal.h>
@@ -9,7 +9,7 @@
 Encoder myEnc(12, 13);
 
 // Pantalla
-LiquidCrystal lcd(8, 9, 4, 5, 6, 7); // Inicializa el LCD con DIR, E, RW, RS, D4, D5, D6, D7)
+LiquidCrystal_I2C lcd(0x27, 2, 1, 0, 4, 5, 6,7); // Inicializa el LCD con DIR, E, RW, RS, D4, D5, D6, D7)
 
 // Pulsador Pantalla
 #define Pulsador_Pantalla 2               // Seleccion de entrada para Pulsador navegar en pantallas
@@ -51,8 +51,6 @@ float Velo_Expiracion_Anterior = 0.0;
 volatile bool Modo_ON = false;     // Inicializacion en ciclo de REPOSO
 volatile bool Cambio_Modo = false; // Indica si hubo un cambio de estado que necesita ser transmitido
 
-unsigned long encoderLastRead;
-
 //*********************************************************************************************************//
 // SETUP
 //*********************************************************************************************************//
@@ -64,8 +62,6 @@ void setup()
   lcd.setBacklightPin(3, POSITIVE); //Se enciende la luz del LCD
   lcd.setBacklight(HIGH);
   lcd.begin(16, 2);
-  pinMode(11, OUTPUT);
-  analogWrite(11, 100);               // Inicializar el LCD con el número de  columnas y filas del LCD
   pinMode(Pulsador_Pantalla, INPUT);  //Le digo que el pin valor, 2 es una entrada digital
   pinMode(Pulsador_Seleccion, INPUT); //Le digo que el pin valor, 3 es una entrada digital
   pinMode(Pulsador_Marcha, INPUT);
@@ -87,10 +83,7 @@ void loop()
       addEndoderValue = -1;
     else
       addEndoderValue = 1;
-    Serial.println(addEndoderValue);
-    Serial.println(newValor);
     myEnc.write(0);
-    encoderLastRead = millis();
   }
 
   // Leer valores de Input
@@ -250,7 +243,6 @@ void loop()
   if ((Velo_Inspiracion != Velo_Inspiracion_Anterior) || (Velo_Expiracion != Velo_Expiracion_Anterior) || (PMAX_Seleccionado != PMAX_Seleccionado_Anterior) || (PEEP_Seleccionado != PEEP_Seleccionado_Anterior) || (Vtidal_Seleccionado != Vtidal_Seleccionado_Anterior) || Cambio_Modo)
   // (Pulsador_Marcha_VALUE == digitalRead(19))
   {
-    /*
     byte byte1, byte2, byte3, byte4, byte5, byte6, byte7, byte8, byte9, byte10, byte11, byte12, byte13, byte14, byte15, byte16, byte17, byte18;
     unsigned int aux;
 
@@ -331,18 +323,7 @@ void loop()
     Wire.write(byte18);
     Wire.endTransmission(); // Termina a transmissão
   }
-*/
-    Serial.print("Vel. Inspiracion: ");
-    Serial.println(Velo_Inspiracion);
-    Serial.print("Vel. Expiracion: ");
-    Serial.println(Velo_Expiracion);
-    Serial.print("PMAX: ");
-    Serial.println(PMAX_Seleccionado);
-    Serial.print("PEEP: ");
-    Serial.println(PEEP_Seleccionado);
-    Serial.print("Vtidal: ");
-    Serial.println(Vtidal_Seleccionado);
-  }
+
   Velo_Inspiracion_Anterior = Velo_Inspiracion;
   Velo_Expiracion_Anterior = Velo_Expiracion;
   PMAX_Seleccionado_Anterior = PMAX_Seleccionado;
