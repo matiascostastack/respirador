@@ -232,6 +232,9 @@ void manejoCiclo()
 {
     //if (estaEnDelay)
     //return;
+
+    if (Pasos_Avance == 0)
+        return;
     
     // Manejar los ciclos
     switch (CicloActual)
