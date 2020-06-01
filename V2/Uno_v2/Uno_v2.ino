@@ -204,7 +204,7 @@ void loop()
             CalcularParametros();
 
         // Graficos
-        manejoGraficos();
+        //manejoGraficos();
 
         // Ciclo de funcionamiento
         manejoCiclo();
