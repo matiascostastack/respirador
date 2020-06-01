@@ -186,7 +186,7 @@ void setup()
 
 void loop()
 {
-    checkDelay();
+    //checkDelay();
     
     Posicion = myEncoder.read(); // read position
                                  // Serial.print("Posicion:"); // print the position
@@ -230,8 +230,8 @@ void loop()
 
 void manejoCiclo()
 {
-    if (estaEnDelay)
-    return;
+    //if (estaEnDelay)
+    //return;
     
     // Manejar los ciclos
     switch (CicloActual)
@@ -257,10 +257,10 @@ void manejoCiclo()
 
             // Imprimer el tiempo que duro el ciclo de inspiracion
             Serial.print("Tiempo Expiracion: ");
-            Serial.println((millis() - Tiempo_Ciclo) / 1000);
-            Tiempo_Ciclo = millis();
+            Serial.println((millis() - Aux_Tiempo_Ciclo) / 1000);
+            Aux_Tiempo_Ciclo = millis();
 
-            delayMillis(1000);
+            delay(1000);
         }
         break;
     case EXPIRACION:
@@ -284,13 +284,13 @@ void manejoCiclo()
 
             // Imprimer el tiempo que duro el ciclo de expiracion
             Serial.print("Tiempo Expiracion: ");
-            Serial.println((millis() - Tiempo_Ciclo) / 1000);
-            Tiempo_Ciclo = millis();
+            Serial.println((millis() - Aux_Tiempo_Ciclo) / 1000);
+            Aux_Tiempo_Ciclo = millis();
 
             // Calcula los parametro para el siguiente ciclo
             CalcularParametros();
 
-            delayMillis(1000);
+            delay(1000);
         }
         break;
     default:
@@ -320,23 +320,23 @@ void manejoAlarmas()
 void manejoGraficos()
 {
     // Chequear Intervalos para graficos
-    if ((unsigned long)millis() - Presion_Grafica_Ultimo > Presion_Grafica_Intervalo_Milli)
+    if ((unsigned long)millis() - Aux_Presion_Grafica > Presion_Grafica_Intervalo)
     {
         Presion_Grafica();
-        Presion_Grafica_Ultimo = millis();
+        Aux_Presion_Grafica = millis();
     }
 
-    if ((unsigned long)millis() - Volumen_Grafica_Ultimo > Volumen_Grafica_Intervalo_Milli)
+    if ((unsigned long)millis() - Aux_Volumen_Grafica > Volumen_Grafica_Intervalo)
     {
         Volumen_Grafica();
-        Volumen_Grafica_Ultimo = millis();
+        Aux_Volumen_Grafica = millis();
     }
 }
 
 //**********************************************************************************************************************************************//
 // Funcion de delay propia para no bloquear el loop principal y poder realizar operaciones secundarias                                                                              //
 //**********************************************************************************************************************************************//
-
+/*
 bool estaEnDelay() {
   return Aux_En_Delay;
 }
@@ -363,7 +363,7 @@ void delayMillis(unsigned long time)
   Aux_Delay_Time = time;
   Aux_En_Delay = true;
 }
-
+*/
 //**********************************************************************************************************************************************//
 // Función de Lectura de datos enviados por el Maestro del bus I2C                                                                              //
 //**********************************************************************************************************************************************//
