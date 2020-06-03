@@ -187,7 +187,7 @@ void setup()
 void loop()
 {
     //checkDelay();
-    
+
     Posicion = myEncoder.read(); // read position
                                  // Serial.print("Posicion:"); // print the position
     //Serial.println(Posicion);
@@ -204,7 +204,7 @@ void loop()
             CalcularParametros();
 
         // Graficos
-        //manejoGraficos();
+        manejoGraficos();
 
         // Ciclo de funcionamiento
         manejoCiclo();
@@ -230,12 +230,12 @@ void loop()
 
 void manejoCiclo()
 {
-    //if (estaEnDelay)
-    //return;
+    if (estaEnDelay)
+        return;
 
     if (Pasos_Avance == 0)
         return;
-    
+
     // Manejar los ciclos
     switch (CicloActual)
     {
@@ -263,7 +263,7 @@ void manejoCiclo()
             Serial.println((millis() - Aux_Tiempo_Ciclo) / 1000);
             Aux_Tiempo_Ciclo = millis();
 
-            delay(1000);
+            delayMillis(1000);
         }
         break;
     case EXPIRACION:
@@ -293,7 +293,7 @@ void manejoCiclo()
             // Calcula los parametro para el siguiente ciclo
             CalcularParametros();
 
-            delay(1000);
+            delayMillis(1000);
         }
         break;
     default:
@@ -325,21 +325,21 @@ void manejoGraficos()
     // Chequear Intervalos para graficos
     if ((unsigned long)millis() - Aux_Presion_Grafica > Presion_Grafica_Intervalo)
     {
-        Presion_Grafica();
-        Aux_Presion_Grafica = millis();
+        if (Presion_Grafica())
+            Aux_Presion_Grafica = millis();
     }
 
     if ((unsigned long)millis() - Aux_Volumen_Grafica > Volumen_Grafica_Intervalo)
     {
-        Volumen_Grafica();
-        Aux_Volumen_Grafica = millis();
+        if (Volumen_Grafica())
+            Aux_Volumen_Grafica = millis();
     }
 }
 
 //**********************************************************************************************************************************************//
 // Funcion de delay propia para no bloquear el loop principal y poder realizar operaciones secundarias                                                                              //
 //**********************************************************************************************************************************************//
-/*
+
 bool estaEnDelay() {
   return Aux_En_Delay;
 }
@@ -366,7 +366,7 @@ void delayMillis(unsigned long time)
   Aux_Delay_Time = time;
   Aux_En_Delay = true;
 }
-*/
+
 //**********************************************************************************************************************************************//
 // Función de Lectura de datos enviados por el Maestro del bus I2C                                                                              //
 //**********************************************************************************************************************************************//
@@ -518,17 +518,26 @@ void ChequeoPEEP()
 //**********************************************************************************************************************************************//
 // Funcion para la obtencion de una grafica de presion. Se desactiva luego de las pruebas
 //**********************************************************************************************************************************************//
-void Presion_Grafica()
+float Presion_Grafica_Valores = 0;
+int Presion_Grafica_Valor_Actual = 0;
+unsigned long Presion_Grafica_Valores_Timer = 0;
+const float AP = 0.01; //Error en la presión
+bool Presion_Grafica()
 {
-    float Aux2 = 0.0;
-    int g = 0;
-    float AP = 0.01; //Error en la presión
-    for (g = 0; g < 10; g++)
+    if ((unsigned long)millis() - Presion_Grafica_Valores_Timer < 5)
     {
-        Aux2 = Aux2 + (float(analogRead(A0) * 5.0 / 1023.0)); //Leo la entrada analogica que tiene conectada el sensor de presión
-        delay(5);
+        return false;
     }
-    Vout2 = Aux2 / 10.0;
+
+    Presion_Grafica_Valores = Presion_Grafica_Valores + (float(analogRead(A0) * 5.0 / 1023.0)); //Leo la entrada analogica que tiene conectada el sensor de presión
+    Presion_Grafica_Valor_Actual++;
+    if (Presion_Grafica_Valor_Actual < 10)
+    {
+        Presion_Grafica_Valores_Timer = millis();
+        return false;
+    }
+
+    Vout2 = Presion_Grafica_Valores / 10.0;
     P1 = ((Vout2 - 0.04 * Vs) / (0.09 * Vs) + AP) * 10.1972; // 10.1972Se multiplica por el equivalente para la conversion a cmH20
     P1 = 1.002 * P1 + 0.182;                                 // Regresion lineal obtenida de los valores experimentales. Ver tabla en excel
     P1_1 = (1.002 * P1 + 0.182) * (1000.0 / 10.1972);        // Presion en Pasacales para los calculos de caudal en bernoulli
@@ -536,24 +545,44 @@ void Presion_Grafica()
                                                              // Serial.println(P1);
     Serial.print("Presion P1 [Pascales]:");
     Serial.println(P1_1);
+
+    Presion_Grafica_Valor_Actual = 0;
+    Presion_Grafica_Valores_Timer = 0;
+    Presion_Grafica_Valores = 0;
+    return true;
 }
 
-void Volumen_Grafica()
+float Volumen_Grafica_Valores = 0;
+int Volumen_Grafica_Valor_Actual = 0;
+unsigned long Volumen_Grafica_Valores_Timer = 0;
+const float AP2 = 0.01; //Error en la presión
+bool Volumen_Grafica()
 {
-    float Aux3 = 0.0;
-    int e = 0;
-    float AP2 = 0.01; //Error en la presión
-    for (e = 0; e < 10; e++)
+    if ((unsigned long)millis() - Volumen_Grafica_Valores_Timer < 5)
     {
-        Aux3 = Aux3 + (float(analogRead(A1) * 5.0 / 1023.0)); //Leo la entrada analogica que tiene conectada el sensor de presión
-        delay(5);
+        return false;
     }
-    Vout3 = Aux3 / 10.0;
+
+    Volumen_Grafica_Valores = Volumen_Grafica_Valores + (float(analogRead(A1) * 5.0 / 1023.0)); //Leo la entrada analogica que tiene conectada el sensor de presión
+    Volumen_Grafica_Valor_Actual++;
+
+    if (Volumen_Grafica_Valor_Actual < 10)
+    {
+        Volumen_Grafica_Valores_Timer = millis();
+        return false;
+    }
+
+    Vout3 = Volumen_Grafica_Valores / 10.0;
     P2 = ((Vout3 - 0.04 * Vs2) / (0.09 * Vs2) + AP2) * 1000.0; // Se multuplica x 1000 para obtener el valor en Pascales, unidad que necesitamos en la ecuacion de bernoulli
                                                                //  En volumen vamos a trabajar las presiones en Pascales (El sensor da el valor en KPA hay que convertir o multiplicar por 1000 para tener el mismo en pascales)
     P2 = 1.017 * P2 - 0.474;                                   // Regresion lineal obtenida de los valores experimentales. Ver tabla en excel
     Serial.print("Presion P2:[Pasacales]");
     Serial.println(P2);
+
+    Volumen_Grafica_Valor_Actual = 0;
+    Volumen_Grafica_Valores_Timer = 0;
+    Volumen_Grafica_Valores = 0;
+    return true;
 }
 
 void Caudal()
