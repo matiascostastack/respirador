@@ -214,7 +214,7 @@ void loop()
     }
     else
     {
-      
+
         if (AlarmaActual == ALARMA_PIP)
         {
             AlarmaContinua();
@@ -225,7 +225,7 @@ void loop()
 
             if (digitalRead(Led_Marcha) == HIGH)
                 IrAlInicio();
-                
+
             digitalWrite(Led_Marcha, LOW);
         }
     }
@@ -233,11 +233,11 @@ void loop()
 
 void manejoCiclo()
 {
-     if (estaEnDelay())
+    if (estaEnDelay())
         return;
 
     if (Pasos_Avance == 0)
-       return;
+        return;
 
     // Manejar los ciclos
     switch (CicloActual)
@@ -255,10 +255,12 @@ void manejoCiclo()
         else
         {
             // Chequear presión PIP al final del ciclo de inspiración
-if (ChequeoPIP()) {
-return;
-}
-// Cambiar el estado del ciclo
+            if (ChequeoPIP())
+            {
+                return;
+            }
+
+            // Cambiar el estado del ciclo
             CicloActual = EXPIRACION;
             Pasos_Actuales = 0;
 
@@ -268,7 +270,6 @@ return;
             Aux_Tiempo_Ciclo = millis();
 
             delayMillis(100);
-            
         }
         break;
     case EXPIRACION:
@@ -285,7 +286,7 @@ return;
         {
             // Chequear presión PEEP al final del ciclo de inspiración
             ChequeoPEEP();
-            
+
             // Cambiar el estado del ciclo
             CicloActual = INSPIRACION;
             Pasos_Actuales = 0;
@@ -294,11 +295,10 @@ return;
             Serial.print("Tiempo Expiracion: ");
             Serial.println((millis() - Aux_Tiempo_Ciclo) / 1000.0);
             Aux_Tiempo_Ciclo = millis();
-            
+
             // Calcula los parametro para el siguiente ciclo
             CalcularParametros();
             delayMillis(1000);
-           
         }
         break;
     default:
@@ -345,31 +345,32 @@ void manejoGraficos()
 // Funcion de delay propia para no bloquear el loop principal y poder realizar operaciones secundarias                                                                              //
 //**********************************************************************************************************************************************//
 
-bool estaEnDelay() {
-  return Aux_En_Delay;
+bool estaEnDelay()
+{
+    return Aux_En_Delay;
 }
 
 void checkDelay()
 {
-  if (!Aux_En_Delay)
-    return;
+    if (!Aux_En_Delay)
+        return;
 
-  if ((unsigned long)millis() - Aux_Delay_Begin >= Aux_Delay_Time)
-  {
-    Aux_En_Delay = false;
-    Aux_Delay_Time = 0;
-    Aux_Delay_Begin = 0;
-  }
+    if ((unsigned long)millis() - Aux_Delay_Begin >= Aux_Delay_Time)
+    {
+        Aux_En_Delay = false;
+        Aux_Delay_Time = 0;
+        Aux_Delay_Begin = 0;
+    }
 }
 
 void delayMillis(unsigned long time)
 {
-  if (Aux_En_Delay)
-    return;
+    if (Aux_En_Delay)
+        return;
 
-  Aux_Delay_Begin = millis();
-  Aux_Delay_Time = time;
-  Aux_En_Delay = true;
+    Aux_Delay_Begin = millis();
+    Aux_Delay_Time = time;
+    Aux_En_Delay = true;
 }
 
 //**********************************************************************************************************************************************//
@@ -435,8 +436,9 @@ void receiveEvent(int cantBytes)
     Modo_ON = (bool)byte17;
     if (Modo_ON)
         AlarmaActual = SIN_ALARMA;
-Serial.print("Modo");
-Serial.println(Modo_ON);
+    Serial.print("Modo");
+    Serial.println(Modo_ON);
+
     //Porcentaje Volumen Tidal
     Vtidal = byte18;
 }
@@ -507,10 +509,12 @@ bool ChequeoPIP()
         AlarmaActual = ALARMA_PIP;
         IrAlInicio();
         Modo_ON = false;
+        return true;
     }
+    return false;
 }
 
-void ChequeoPEEP()
+bool ChequeoPEEP()
 {
     Presion_PEEP = Presion();
     if (Presion_PIP > PMAX)
@@ -518,7 +522,9 @@ void ChequeoPEEP()
         InformarAlarma(ALARMA_PEEP);
         IrAlInicio();
         AlarmaActual = ALARMA_PEEP;
+        return true;
     }
+    return false;
 }
 
 //**********************************************************************************************************************************************//
@@ -547,11 +553,12 @@ bool Presion_Grafica()
     P1 = ((Vout2 - 0.04 * Vs) / (0.09 * Vs) + AP) * 10.1972; // 10.1972Se multiplica por el equivalente para la conversion a cmH20
     P1 = 1.002 * P1 + 0.182;                                 // Regresion lineal obtenida de los valores experimentales. Ver tabla en excel
     P1_1 = (1.002 * P1 + 0.182) * (1000.0 / 10.1972);        // Presion en Pasacales para los calculos de caudal en bernoulli
-                                                             // Serial.print("Presion del sistema en CmH2O:");
-                                                             // Serial.println(P1);
-   // Serial.print("Presion P1 [Pascales]:");
-   // Serial.println(P1_1);
- MyPlot.SendData("Presion", P1);
+
+    // Serial.print("Presion del sistema en CmH2O:");
+    // Serial.println(P1);
+    // Serial.print("Presion P1 [Pascales]:");
+    // Serial.println(P1_1);
+    MyPlot.SendData("Presion", P1);
     Presion_Grafica_Valor_Actual = 0;
     Presion_Grafica_Valores_Timer = 0;
     Presion_Grafica_Valores = 0;
@@ -582,8 +589,8 @@ bool Volumen_Grafica()
     P2 = ((Vout3 - 0.04 * Vs2) / (0.09 * Vs2) + AP2) * 1000.0; // Se multuplica x 1000 para obtener el valor en Pascales, unidad que necesitamos en la ecuacion de bernoulli
                                                                //  En volumen vamos a trabajar las presiones en Pascales (El sensor da el valor en KPA hay que convertir o multiplicar por 1000 para tener el mismo en pascales)
     P2 = 1.017 * P2 - 0.474;                                   // Regresion lineal obtenida de los valores experimentales. Ver tabla en excel
- //   Serial.print("Presion P2:[Pasacales]");
- //   Serial.println(P2);
+    //   Serial.print("Presion P2:[Pasacales]");
+    //   Serial.println(P2);
 
     Volumen_Grafica_Valor_Actual = 0;
     Volumen_Grafica_Valores_Timer = 0;
@@ -615,8 +622,8 @@ void Caudal()
     den = rho * (pow(A1, 2) - pow(A2, 2)); // Valor del denominador para obtener la velocidad. , queda sin unidad
     V1 = A2 * pow((num / den), 0.5);       // Calculo la velocidad 1 en m/s
     Q = A1 * V1;                           // Calculo el caudal
-   // Serial.print("Caudal:");
-   // Serial.println(Q);
+    // Serial.print("Caudal:");
+    // Serial.println(Q);
 }
 
 //**********************************************************************************************************************************************//
@@ -637,6 +644,7 @@ void IrAlInicio()
         digitalWrite(stepPin, LOW);
         delayMicroseconds(Velo_Motor_Exp / 2.0);
     }
+    Pasos_Avance = 0;
     Pasos_Actuales = 0;
     CicloActual = INSPIRACION;
 }
