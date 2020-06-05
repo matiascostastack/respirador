@@ -222,7 +222,6 @@ void loop()
             if (digitalRead(Led_Marcha) == HIGH)
                 IrAlInicio();
 
-            Pasos_Avance = 0; // Setear el valor en cero para que se calculen los parametros cuando se reactiva
             digitalWrite(Led_Marcha, LOW);
         }
     }
@@ -252,7 +251,9 @@ void manejoCiclo()
         else
         {
             // Chequear presión PIP al final del ciclo de inspiración
-            ChequeoPIP();
+            if (ChequeoPIP()) {
+                return;
+            }
 
             // Cambiar el estado del ciclo
             CicloActual = EXPIRACION;
@@ -490,7 +491,7 @@ double Presion()
     return P1;
 }
 
-void ChequeoPIP()
+bool ChequeoPIP()
 {
     Presion_PIP = Presion();
     delay(100);
@@ -501,10 +502,12 @@ void ChequeoPIP()
         IrAlInicio();
         AlarmaActual = ALARMA_PIP;
         Modo_ON = false;
+        return true;
     }
+    return false;
 }
 
-void ChequeoPEEP()
+bool ChequeoPEEP()
 {
     Presion_PEEP = Presion();
     if (Presion_PIP > PMAX)
@@ -512,7 +515,9 @@ void ChequeoPEEP()
         InformarAlarma(ALARMA_PEEP);
         IrAlInicio();
         AlarmaActual = ALARMA_PEEP;
+        return true;
     }
+    return false;
 }
 
 //**********************************************************************************************************************************************//
@@ -631,6 +636,7 @@ void IrAlInicio()
         digitalWrite(stepPin, LOW);
         delayMicroseconds(Velo_Motor_Exp / 2.0);
     }
+    Pasos_Avance = 0;
     Pasos_Actuales = 0;
     CicloActual = INSPIRACION;
 }
