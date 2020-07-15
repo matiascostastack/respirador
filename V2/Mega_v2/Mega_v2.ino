@@ -9,7 +9,7 @@
 Encoder myEnc(2, 4);
 
 // Pantalla
-LiquidCrystal_I2C lcd(0x27, 2, 1, 0, 4, 5, 6,7); // Inicializa el LCD con DIR, E, RW, RS, D4, D5, D6, D7)
+LiquidCrystal_I2C lcd(0x27, 2, 1, 0, 4, 5, 6, 7); // Inicializa el LCD con DIR, E, RW, RS, D4, D5, D6, D7)
 
 // Pulsador Pantalla
 #define Pulsador_Pantalla 5               // Seleccion de entrada para Pulsador navegar en pantallas
@@ -50,9 +50,9 @@ float Velo_Inspiracion_Anterior = 0.0;
 float Velo_Expiracion = 0.0;
 float Velo_Expiracion_Anterior = 0.0;
 
-float LCD_Presion_PIP =0.0;
-float LCD_Presion_Plateau =0.0;
-float LCD_Presion_PEEP =0.0;
+float LCD_Presion_PIP = 0.0;
+float LCD_Presion_Plateau = 0.0;
+float LCD_Presion_PEEP = 0.0;
 
 volatile bool Modo_ON = false;     // Inicializacion en ciclo de REPOSO
 volatile bool Cambio_Modo = false; // Indica si hubo un cambio de estado que necesita ser transmitido
@@ -81,45 +81,8 @@ void setup()
 //*********************************************************************************************************//
 void loop()
 {
-  Wire.requestFrom(4,12); //4,4 significa nodo 4, 4 bytes
-  byte Rx_slave1, Rx_slave2, Rx_slave3, Rx_slave4, Rx_slave5, Rx_slave6, Rx_slave7, Rx_slave8, Rx_slave9, Rx_slave10, Rx_slave11, Rx_slave12;
-  Rx_slave1 = Wire.read();
-  Rx_slave2 = Wire.read();
-  Rx_slave3 = Wire.read();
-  Rx_slave4 = Wire.read();
-  Rx_slave5 = Wire.read();
-  Rx_slave6 = Wire.read();
-  Rx_slave7 = Wire.read();
-  Rx_slave8 = Wire.read();
-  Rx_slave9 = Wire.read();
-  Rx_slave10 = Wire.read();
-  Rx_slave11 = Wire.read();
-  Rx_slave12 = Wire.read();
+  checkDelay();
 
-  unsigned int aux_rx;
-  aux_rx = (Rx_slave3 << 8) | Rx_slave4;               // Ajusta a parte fracionáia (depois da vírgula)
-  LCD_Presion_PIP = (float)(aux_rx * 0.0001);       // Atribui a parte fracionária, depois da vírgula
-  aux_rx = (Rx_slave1 << 8) | Rx_slave2;               // Ajusta a parte inteira (antes da vírgula)
-  LCD_Presion_PIP += aux_rx;                         // Atribui a parte iteira
-
-  aux_rx = (Rx_slave7 << 8) | Rx_slave8;               // Ajusta a parte fracionáia (depois da vírgula)
-  LCD_Presion_Plateau = (float)(aux_rx * 0.0001);       // Atribui a parte fracionária, depois da vírgula
-  aux_rx = (Rx_slave5 << 8) | Rx_slave6;               // Ajusta a parte inteira (antes da vírgula)
-  LCD_Presion_Plateau += aux_rx;                         // Atribui a parte iteira
-
-  aux_rx = (Rx_slave11 << 8) | Rx_slave12;               // Ajusta a parte fracionáia (depois da vírgula)
-  LCD_Presion_PEEP = (float)(aux_rx * 0.0001);       // Atribui a parte fracionária, depois da vírgula
-  aux_rx = (Rx_slave9 << 8) | Rx_slave10;               // Ajusta a parte inteira (antes da vírgula)
-  LCD_Presion_PEEP += aux_rx;                         // Atribui a parte iteir
-
-  //Serial.print("Presion PIP");
-  //Serial.println(LCD_Presion_PIP);
- //   Serial.print("Presion Plateau");
- // Serial.println(LCD_Presion_Plateau);
-  //  Serial.print("Presion PEEP");
-  //Serial.println(LCD_Presion_PEEP);
-
-  
   int newValor = myEnc.read();
   int addEndoderValue = 0;
   if (newValor != 0 && newValor % 4 == 0)
@@ -140,7 +103,7 @@ void loop()
   {
     Modo_ON = true;
     Cambio_Modo = true;
-  //  Serial.print("------ MARCHA ------");
+    //  Serial.print("------ MARCHA ------");
   }
   Pulsador_Marcha_VALUE_Anterior = Pulsador_Marcha_VALUE;
 
@@ -221,6 +184,12 @@ void loop()
     break;
 
   case 5:
+    // Lee los valores sensados solo si necesita mostrarlos en la pantalla
+    if (estaEnDelay())
+      break;
+
+    LeerValoresSensados();
+
     lcd.setCursor(0, 0);
     lcd.print("PIP:"); // Escribimos el Mensaje en el LCD.
     lcd.setCursor(4, 0);
@@ -235,6 +204,9 @@ void loop()
     lcd.print(LCD_Presion_PEEP); // Escribimos el Mensaje en el LCD.
     lcd.setCursor(9, 1);
     lcd.print("[cmH2O]"); // Escribimos el Mensaje en el LCD.
+
+    delayMillis(250);
+
     break;
 
   case 6:
@@ -394,6 +366,41 @@ void loop()
   Cambio_Modo = false;
 }
 
+//**********************************************************************************************************************************************//
+// Funcion de delay propia para no bloquear el loop principal y poder realizar operaciones secundarias                                                                              //
+//**********************************************************************************************************************************************//
+volatile bool Aux_En_Delay = false;
+unsigned long Aux_Delay_Time = 0;
+unsigned long Aux_Delay_Begin = 0;
+
+bool estaEnDelay()
+{
+  return Aux_En_Delay;
+}
+
+void checkDelay()
+{
+  if (!Aux_En_Delay)
+    return;
+
+  if ((unsigned long)millis() - Aux_Delay_Begin >= Aux_Delay_Time)
+  {
+    Aux_En_Delay = false;
+    Aux_Delay_Time = 0;
+    Aux_Delay_Begin = 0;
+  }
+}
+
+void delayMillis(unsigned long time)
+{
+  if (Aux_En_Delay)
+    return;
+
+  Aux_Delay_Begin = millis();
+  Aux_Delay_Time = time;
+  Aux_En_Delay = true;
+}
+
 //****************************************************************************************************************
 // Funcion Pulsador de Marcha
 //****************************************************************************************************************
@@ -409,7 +416,52 @@ void Pulsador_Parada()
 {
   Modo_ON = false;
   Cambio_Modo = true;
-//  Serial.print("------ PARADA ------");
+  //  Serial.print("------ PARADA ------");
+}
+
+//****************************************************************************************************************
+// Leer los valores sensados
+//****************************************************************************************************************
+
+void LeerValoresSensados()
+{
+  Wire.requestFrom(4, 12); //4,4 significa nodo 4, 4 bytes
+  byte Rx_slave1, Rx_slave2, Rx_slave3, Rx_slave4, Rx_slave5, Rx_slave6, Rx_slave7, Rx_slave8, Rx_slave9, Rx_slave10, Rx_slave11, Rx_slave12;
+  Rx_slave1 = Wire.read();
+  Rx_slave2 = Wire.read();
+  Rx_slave3 = Wire.read();
+  Rx_slave4 = Wire.read();
+  Rx_slave5 = Wire.read();
+  Rx_slave6 = Wire.read();
+  Rx_slave7 = Wire.read();
+  Rx_slave8 = Wire.read();
+  Rx_slave9 = Wire.read();
+  Rx_slave10 = Wire.read();
+  Rx_slave11 = Wire.read();
+  Rx_slave12 = Wire.read();
+
+  unsigned int aux_rx;
+  aux_rx = (Rx_slave3 << 8) | Rx_slave4;      // Ajusta a parte fracionáia (depois da vírgula)
+  LCD_Presion_PIP = (float)(aux_rx * 0.0001); // Atribui a parte fracionária, depois da vírgula
+  aux_rx = (Rx_slave1 << 8) | Rx_slave2;      // Ajusta a parte inteira (antes da vírgula)
+  LCD_Presion_PIP += aux_rx;                  // Atribui a parte iteira
+
+  aux_rx = (Rx_slave7 << 8) | Rx_slave8;          // Ajusta a parte fracionáia (depois da vírgula)
+  LCD_Presion_Plateau = (float)(aux_rx * 0.0001); // Atribui a parte fracionária, depois da vírgula
+  aux_rx = (Rx_slave5 << 8) | Rx_slave6;          // Ajusta a parte inteira (antes da vírgula)
+  LCD_Presion_Plateau += aux_rx;                  // Atribui a parte iteira
+
+  aux_rx = (Rx_slave11 << 8) | Rx_slave12;     // Ajusta a parte fracionáia (depois da vírgula)
+  LCD_Presion_PEEP = (float)(aux_rx * 0.0001); // Atribui a parte fracionária, depois da vírgula
+  aux_rx = (Rx_slave9 << 8) | Rx_slave10;      // Ajusta a parte inteira (antes da vírgula)
+  LCD_Presion_PEEP += aux_rx;                  // Atribui a parte iteir
+
+  //Serial.print("Presion PIP");
+  //Serial.println(LCD_Presion_PIP);
+  //   Serial.print("Presion Plateau");
+  // Serial.println(LCD_Presion_Plateau);
+  //  Serial.print("Presion PEEP");
+  //Serial.println(LCD_Presion_PEEP);
 }
 
 //****************************************************************************************************************
@@ -603,7 +655,7 @@ void NewVtidal(int value)
   lcd.setCursor(4, 1);
   lcd.print(Valor_Actual_Pantalla); // Escribimos el Mensaje en el LCD.
   lcd.setCursor(9, 1);
-  lcd.print("SET:");            // Escribimos el Mensaje en el LCD.
+  lcd.print("SET:");              // Escribimos el Mensaje en el LCD.
   lcd.print(Vtidal_Seleccionado); // Escribimos el Mensaje en el LCD.
 }
 
