@@ -38,7 +38,7 @@ volatile unsigned long encoderUltimaInterrupcion = 0; // variable static con ult
 Encoder myEncoder(2, 4);
 
 // Sensor Home
-#define Sensor_Home 10 // Se define el pin 9 como la conexion del sensor de Home (optoacoplador)
+#define Sensor_Home 10 // Se define el pin 10 como la conexion del sensor de Home (optoacoplador)
 
 //Se definen las conexiones con arduino Pin 2 dirección, Pin 3 Pasos. Con el driver TB6600 se utiliza la interface tipo 1
 #define dirPin 8
@@ -59,8 +59,8 @@ unsigned long Tiempo_Alarma_Transcurrido = 0;
 
 // Seteos de valores de la relacion y configuracion del sistema. Al variarlos aqui variaran uniformamente en la logica
 float Angulo_Brazos = 0;
-float Relacion_Transmision = 5;
-float Cantidad_Pulsos_Apriete = 900.0;
+float Relacion_Transmision = 26.4705882;
+float Cantidad_Pulsos_Apriete = 5000.0;
 float Cantidad_Pulsos_Motor = 3200.0;
 float Pasos_Avance = 0.0;
 float Velo_Motor_Insp = 0.0;
@@ -79,12 +79,13 @@ double P1_1 = 0.0;
 double P2 = 0.0;
 
 double Presion_PIP = 0.0;
+double Presion_PIP_Anterior = 0.0;
 double Presion_Plateau = 0.0;
 double Presion_PEEP = 0.0;
 
 // Intervalo para Graficos
-unsigned long Presion_Grafica_Intervalo = 50; // Intervalo en ms para generar el grafico
-unsigned long Volumen_Grafica_Intervalo = 50; // Intervalo en ms para generar el grafico
+//unsigned long Presion_Grafica_Intervalo = 50; // Intervalo en ms para generar el grafico
+//unsigned long Volumen_Grafica_Intervalo = 1500; // Intervalo en ms para generar el grafico
 
 // Auxiliares Delay
 unsigned long Aux_Tiempo_Ciclo = 0;
@@ -117,7 +118,8 @@ void setup()
     // Serial.println("Listo");                                    // imprime en monitor serial Listo
     Wire.begin(4);                // Inicia como esclavo con dirección 4 en la comunicación I2C
     Wire.onReceive(receiveEvent); //Interrupción habilitada cuando el maestro envía bytes en la comunicación I2C
-
+    Wire.onRequest(sendEvent);
+    
     //*********************************************************************************************************//
     // Tomamos valores de presion del sistema con una interrupcion para graficar dicha presion
     //*********************************************************************************************************//
@@ -131,7 +133,7 @@ void setup()
     // Inicializacion de la posicion de los brazos. Al encender se irán a posición Home
     //************************************************************************************************//
 
-    while (!digitalRead(Sensor_Home))
+    while (digitalRead(Sensor_Home))
     { // Muevo el motor en CCW hasta que se active el optoacoplador
         digitalWrite(Led_Home, HIGH);
         digitalWrite(dirPin, LOW);
@@ -153,7 +155,7 @@ void setup()
     //  stepper.setAcceleration(100);  // Set Acceleration of Stepper
     //  initial_homing=1;
 
-    while (digitalRead(Sensor_Home))
+    while (!digitalRead(Sensor_Home))
     { // Make the Stepper move CW until the switch is deactivated
         digitalWrite(Led_Home, HIGH);
         // stepper.moveTo(initial_homing);
@@ -174,7 +176,7 @@ void setup()
     Serial.println("Homing Completed"); //Lo utilizo para visualizar el dato en el RS232
 
     digitalWrite(dirPin, HIGH);
-    for (int d = 0; d < 1200; d++) //Forward 1600 steps
+    for (int d = 0; d < 2000; d++) //Forward 1600 steps
     {
         digitalWrite(stepPin, HIGH);
         delayMicroseconds(400);
@@ -257,6 +259,7 @@ void manejoCiclo()
             // Chequear presión PIP al final del ciclo de inspiración
             if (ChequeoPIP())
             {
+                digitalWrite(Led_Marcha, LOW);
                 return;
             }
 
@@ -269,7 +272,7 @@ void manejoCiclo()
             Serial.println((millis() - Aux_Tiempo_Ciclo) / 1000.0);
             Aux_Tiempo_Ciclo = millis();
 
-            delayMillis(100);
+            delayMillis(1000);
         }
         break;
     case EXPIRACION:
@@ -328,17 +331,17 @@ void manejoAlarmas()
 void manejoGraficos()
 {
     // Chequear Intervalos para graficos
-    if ((unsigned long)millis() - Aux_Presion_Grafica > Presion_Grafica_Intervalo)
-    {
-        if (Presion_Grafica())
-            Aux_Presion_Grafica = millis();
-    }
+//    if ((unsigned long)millis() - Aux_Presion_Grafica > Presion_Grafica_Intervalo)
+//    {
+ //       if (Presion_Grafica())
+//            Aux_Presion_Grafica = millis();
+//    }
 
-    if ((unsigned long)millis() - Aux_Volumen_Grafica > Volumen_Grafica_Intervalo)
-    {
-        if (Volumen_Grafica())
-            Aux_Volumen_Grafica = millis();
-    }
+//    if ((unsigned long)millis() - Aux_Volumen_Grafica > Volumen_Grafica_Intervalo)
+//    {
+  //      if (Volumen_Grafica())
+ //           Aux_Volumen_Grafica = millis();
+ //   }
 }
 
 //**********************************************************************************************************************************************//
@@ -422,7 +425,7 @@ void receiveEvent(int cantBytes)
     aux = (byte9 << 8) | byte10;  // Ajusta a parte inteira (antes da vírgula)
     PMAX += aux;                  // Atribui a parte iteira
                                   //   Serial.println("Presion Maxima:");
-                                  //   Serial.println(PMAX);
+                                  //  Serial.println(PMAX);
 
     // Presion PEEP
     aux = (byte15 << 8) | byte16; // Ajusta a parte fracionáia (depois da vírgula)
@@ -434,13 +437,73 @@ void receiveEvent(int cantBytes)
 
     //Inicio de Ciclo
     Modo_ON = (bool)byte17;
-    if (Modo_ON)
+   // if (Modo_ON)
         AlarmaActual = SIN_ALARMA;
-    Serial.print("Modo");
-    Serial.println(Modo_ON);
+   // Serial.print("Modo");
+   // Serial.println(Modo_ON);
 
     //Porcentaje Volumen Tidal
     Vtidal = byte18;
+}
+
+void sendEvent()
+{
+//if (Presion_PIP != Presion_PIP_Anterior )
+  // {
+    byte byte1, byte2, byte3, byte4, byte5, byte6, byte7, byte8, byte9, byte10, byte11, byte12;
+    unsigned int auxi;
+
+    float Presion_PIP_Tx = Presion_PIP;
+    auxi = (unsigned int)Presion_PIP_Tx; // aux = 46689, Pega somente a parte inteira da variável float (0 - 65536)
+    byte2 = auxi;                             // byte2 = 0B01100001, pega apenas os primeros 8 bits
+    byte1 = (auxi >> 8);                      // byte1 = 0B10110110, pega os 8 ultimos bits
+    // Ajustando o número depois da vírgula
+    Presion_PIP_Tx -= auxi;              // Deixa apenas o número depois da vírgula
+    Presion_PIP_Tx *= 10000;            // Multiplica por 10k para pegar 4 dígitos após a vírgula
+    auxi = (unsigned int)Presion_PIP_Tx; // Pega somente o valor antes da vírgula
+    byte4 = auxi;                             // byte2 = 0B00101110, pega apenas os primeros 8 bits
+    byte3 = (auxi >> 8);                      // byte1 = 0B00100010, pega os 8 ultimos bits
+    
+    float Presion_Plateau_Tx = Presion_Plateau;
+    auxi = (unsigned int)Presion_Plateau_Tx; // aux = 46689, Pega somente a parte inteira da variável float (0 - 65536)
+    byte6 = auxi;                             // byte2 = 0B01100001, pega apenas os primeros 8 bits
+    byte5 = (auxi >> 8);                      // byte1 = 0B10110110, pega os 8 ultimos bits
+    // Ajustando o número depois da vírgula
+    Presion_Plateau_Tx -= auxi;              // Deixa apenas o número depois da vírgula
+    Presion_Plateau_Tx *= 10000;            // Multiplica por 10k para pegar 4 dígitos após a vírgula
+    auxi = (unsigned int)Presion_Plateau_Tx; // Pega somente o valor antes da vírgula
+    byte8 = auxi;                             // byte2 = 0B00101110, pega apenas os primeros 8 bits
+    byte7 = (auxi >> 8);                      // byte1 = 0B00100010, pega os 8 ultimos bits
+
+    float Presion_PEEP_Tx = Presion_PEEP;
+    auxi = (unsigned int)Presion_PEEP_Tx; // aux = 46689, Pega somente a parte inteira da variável float (0 - 65536)
+    byte10 = auxi;                             // byte2 = 0B01100001, pega apenas os primeros 8 bits
+    byte9 = (auxi >> 8);                      // byte1 = 0B10110110, pega os 8 ultimos bits
+    // Ajustando o número depois da vírgula
+    Presion_PEEP_Tx -= auxi;              // Deixa apenas o número depois da vírgula
+    Presion_PEEP_Tx *= 10000;            // Multiplica por 10k para pegar 4 dígitos após a vírgula
+    auxi = (unsigned int)Presion_PEEP_Tx; // Pega somente o valor antes da vírgula
+    byte12 = auxi;                             // byte2 = 0B00101110, pega apenas os primeros 8 bits
+    byte11 = (auxi >> 8);                      // byte1 = 0B00100010, pega os 8 ultimos bits 
+    
+    Wire.write(byte1);
+    Wire.write(byte2);
+    Wire.write(byte3);
+    Wire.write(byte4);
+    Wire.write(byte5);
+    Wire.write(byte6);
+    Wire.write(byte7);
+    Wire.write(byte8);
+    Wire.write(byte9);
+    Wire.write(byte10);
+    Wire.write(byte11);
+    Wire.write(byte12);
+
+    
+ // }
+
+//Presion_PIP_Anterior = Presion_PIP;
+
 }
 
 //**********************************************************************************************************************************************//
@@ -501,7 +564,7 @@ double Presion()
 bool ChequeoPIP()
 {
     Presion_PIP = Presion();
-    delay(100);
+    delay(1000);
     Presion_Plateau = Presion();
     if (Presion_PIP > PMAX)
     {

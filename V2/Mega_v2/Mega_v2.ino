@@ -6,18 +6,18 @@
 //#include <LiquidCrystal.h>
 
 // Encoder
-Encoder myEnc(12, 13);
+Encoder myEnc(2, 4);
 
 // Pantalla
 LiquidCrystal_I2C lcd(0x27, 2, 1, 0, 4, 5, 6,7); // Inicializa el LCD con DIR, E, RW, RS, D4, D5, D6, D7)
 
 // Pulsador Pantalla
-#define Pulsador_Pantalla 2               // Seleccion de entrada para Pulsador navegar en pantallas
+#define Pulsador_Pantalla 5               // Seleccion de entrada para Pulsador navegar en pantallas
 int Pulsador_Pantalla_VALUE = 0;          // Variable que guarda el estado de la entrada
 int Pulsador_Pantalla_Anterior_VALUE = 0; // Se guarda el valor anetrior para leer flancos ascendentes en la señal de entrada
 
 // Pulsador Seleccion
-#define Pulsador_Seleccion 3               // Seleccion de entrada para Pulsador navegar en pantallas
+#define Pulsador_Seleccion 6               // Seleccion de entrada para Pulsador navegar en pantallas
 int Pulsador_Seleccion_VALUE = 0;          // Variable que guarda el estado de la entrada
 int Pulsador_Seleccion_Anterior_VALUE = 0; // Se guarda el valor anetrior para leer flancos ascendentes en la señal de entrada
 
@@ -31,14 +31,16 @@ int Contador_IE = 0;
 bool Cambio_Opcion_Pantalla = true;
 int Valor_Actual_Pantalla = 0;
 int Pote_Display = 0;
-int BPM_Seleccionado = 15;
+int BPM_Seleccionado = 26;
 int IE_Seleccionado = 0;
-int PMAX_Seleccionado = 30;
-int PMAX_Seleccionado_Anterior = 30;
+int PMAX_Seleccionado = 40;
+int PMAX_Seleccionado_Anterior = 40;
 int PEEP_Seleccionado = 5;
 int PEEP_Seleccionado_Anterior = 5;
 int Vtidal_Seleccionado = 40; //(En porcentaje. 40 %. Caudal total del ambu 1500ml)
 int Vtidal_Seleccionado_Anterior = 40;
+int Vtidal_Seleccionado_LCD = 700; //500ml
+
 float Tciclo = 0.0;
 float Tinspiracion = 0.0;
 float Texpiracion = 0.0;
@@ -47,6 +49,10 @@ float Velo_Inspiracion = 0.0;
 float Velo_Inspiracion_Anterior = 0.0;
 float Velo_Expiracion = 0.0;
 float Velo_Expiracion_Anterior = 0.0;
+
+float LCD_Presion_PIP =0.0;
+float LCD_Presion_Plateau =0.0;
+float LCD_Presion_PEEP =0.0;
 
 volatile bool Modo_ON = false;     // Inicializacion en ciclo de REPOSO
 volatile bool Cambio_Modo = false; // Indica si hubo un cambio de estado que necesita ser transmitido
@@ -75,6 +81,45 @@ void setup()
 //*********************************************************************************************************//
 void loop()
 {
+  Wire.requestFrom(4,12); //4,4 significa nodo 4, 4 bytes
+  byte Rx_slave1, Rx_slave2, Rx_slave3, Rx_slave4, Rx_slave5, Rx_slave6, Rx_slave7, Rx_slave8, Rx_slave9, Rx_slave10, Rx_slave11, Rx_slave12;
+  Rx_slave1 = Wire.read();
+  Rx_slave2 = Wire.read();
+  Rx_slave3 = Wire.read();
+  Rx_slave4 = Wire.read();
+  Rx_slave5 = Wire.read();
+  Rx_slave6 = Wire.read();
+  Rx_slave7 = Wire.read();
+  Rx_slave8 = Wire.read();
+  Rx_slave9 = Wire.read();
+  Rx_slave10 = Wire.read();
+  Rx_slave11 = Wire.read();
+  Rx_slave12 = Wire.read();
+
+  unsigned int aux_rx;
+  aux_rx = (Rx_slave3 << 8) | Rx_slave4;               // Ajusta a parte fracionáia (depois da vírgula)
+  LCD_Presion_PIP = (float)(aux_rx * 0.0001);       // Atribui a parte fracionária, depois da vírgula
+  aux_rx = (Rx_slave1 << 8) | Rx_slave2;               // Ajusta a parte inteira (antes da vírgula)
+  LCD_Presion_PIP += aux_rx;                         // Atribui a parte iteira
+
+  aux_rx = (Rx_slave7 << 8) | Rx_slave8;               // Ajusta a parte fracionáia (depois da vírgula)
+  LCD_Presion_Plateau = (float)(aux_rx * 0.0001);       // Atribui a parte fracionária, depois da vírgula
+  aux_rx = (Rx_slave5 << 8) | Rx_slave6;               // Ajusta a parte inteira (antes da vírgula)
+  LCD_Presion_Plateau += aux_rx;                         // Atribui a parte iteira
+
+  aux_rx = (Rx_slave11 << 8) | Rx_slave12;               // Ajusta a parte fracionáia (depois da vírgula)
+  LCD_Presion_PEEP = (float)(aux_rx * 0.0001);       // Atribui a parte fracionária, depois da vírgula
+  aux_rx = (Rx_slave9 << 8) | Rx_slave10;               // Ajusta a parte inteira (antes da vírgula)
+  LCD_Presion_PEEP += aux_rx;                         // Atribui a parte iteir
+
+  //Serial.print("Presion PIP");
+  //Serial.println(LCD_Presion_PIP);
+ //   Serial.print("Presion Plateau");
+ // Serial.println(LCD_Presion_Plateau);
+  //  Serial.print("Presion PEEP");
+  //Serial.println(LCD_Presion_PEEP);
+
+  
   int newValor = myEnc.read();
   int addEndoderValue = 0;
   if (newValor != 0 && newValor % 4 == 0)
@@ -95,7 +140,7 @@ void loop()
   {
     Modo_ON = true;
     Cambio_Modo = true;
-    Serial.print("------ MARCHA ------");
+  //  Serial.print("------ MARCHA ------");
   }
   Pulsador_Marcha_VALUE_Anterior = Pulsador_Marcha_VALUE;
 
@@ -176,6 +221,23 @@ void loop()
     break;
 
   case 5:
+    lcd.setCursor(0, 0);
+    lcd.print("PIP:"); // Escribimos el Mensaje en el LCD.
+    lcd.setCursor(4, 0);
+    lcd.print(LCD_Presion_PIP); // Escribimos el Mensaje en el LCD.
+    lcd.setCursor(8, 0);
+    lcd.print(" PL:"); // Escribimos el Mensaje en el LCD.
+    lcd.setCursor(12, 0);
+    lcd.print(LCD_Presion_Plateau); // Escribimos el Mensaje en el LCD.
+    lcd.setCursor(0, 1);
+    lcd.print("PEEP:"); // Escribimos el Mensaje en el LCD.
+    lcd.setCursor(5, 1);
+    lcd.print(LCD_Presion_PEEP); // Escribimos el Mensaje en el LCD.
+    lcd.setCursor(9, 1);
+    lcd.print("[cmH2O]"); // Escribimos el Mensaje en el LCD.
+    break;
+
+  case 6:
     // Pantalla realizada para visulaziar los valores de Tcliclo, Tinsp, Texp, Pmax y PEER !!!!!BORRAR!!!!!
     lcd.setCursor(0, 0);
     lcd.print(Tciclo); // Escribimos el Mensaje en el LCD.
@@ -191,7 +253,7 @@ void loop()
     lcd.print(Pulsador_Seleccion_VALUE); // Escribimos el Mensaje en el LCD.
     break;
 
-  case 6:
+  case 7:
     Contador_Pantalla = 0;
     break;
   }
@@ -347,7 +409,7 @@ void Pulsador_Parada()
 {
   Modo_ON = false;
   Cambio_Modo = true;
-  Serial.print("------ PARADA ------");
+//  Serial.print("------ PARADA ------");
 }
 
 //****************************************************************************************************************
@@ -442,7 +504,7 @@ void SetIE(int value)
 
 // P Max  ****************************************************************************************************************
 #define PmaxMinValue 3
-#define PmaxMaxValue 40
+#define PmaxMaxValue 60
 void NewPmax(int value)
 {
   if (Valor_Actual_Pantalla + value > PmaxMaxValue || Valor_Actual_Pantalla + value < PmaxMinValue)
@@ -482,7 +544,7 @@ void SetPmax(int value)
 
 // PEEP  ****************************************************************************************************************
 #define PeepMinValue 0
-#define PeepMaxValue 10
+#define PeepMaxValue 25
 void NewPeep(int value)
 {
   if (Valor_Actual_Pantalla + value > PeepMaxValue || Valor_Actual_Pantalla + value < PeepMinValue)
