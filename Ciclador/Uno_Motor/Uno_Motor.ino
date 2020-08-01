@@ -4,6 +4,12 @@
 #include <Encoder.h>
 #include "MegunoLink.h"
 
+typedef enum ModoOperacion
+{
+    VCV,
+    PSV
+}
+
 typedef enum TipoDeCiclo
 {
     INSPIRACION,
@@ -20,6 +26,8 @@ typedef enum TipoDeAlarma
 };
 
 bool Modo_ON = false; // Inicializacion en ciclo de REPOSO
+ModoOperacion ModoSeleccionado = VCV;
+ModoOperacion ModoActual = VCV;
 TipoDeCiclo CicloActual = INSPIRACION;
 TipoDeAlarma AlarmaActual = SIN_ALARMA;
 
@@ -28,9 +36,10 @@ float Velo_Expiracion = 0.0;
 float PMAX = 0;
 float PEEP = 0;
 
+bool ForzarCalculoInicioCiclo = true;
 int Vtidal = 0;
 int PTrigger = 0;
-int Modo_Seleccionado = 0;
+#define PsvTiempoEspera 15                          // Intervalo entre los ciclos espresado en segundos
 
 //Enconder
 #define A 2                                           //variable A del econder a pin digital 2 (DT en modulo)
@@ -97,9 +106,6 @@ double Presion_PEEP = 0.0;
 unsigned long Aux_Tiempo_Ciclo = 0;
 unsigned long Aux_Presion_Grafica = 0;
 unsigned long Aux_Volumen_Grafica = 0;
-volatile bool Aux_En_Delay = false;
-unsigned long Aux_Delay_Time = 0;
-unsigned long Aux_Delay_Begin = 0;
 
 TimePlot MyPlot;
 
@@ -121,14 +127,14 @@ void setup()
     pinMode(Led_Home, OUTPUT);
     pinMode(Led_Marcha, OUTPUT);
     pinMode(Led_Falla, OUTPUT);
-    
+
     // attachInterrupt(digitalPinToInterrupt(A), encoder, FALLING); // interrupcion sobre pin A con funcion ISR encoder y modo LOW
     //attachInterrupt(digitalPinToInterrupt(B), encoder, LOW);    // interrupcion sobre pin A con funcion ISR encoder y modo LOW
     // Serial.println("Listo");                                    // imprime en monitor serial Listo
     Wire.begin(4);                // Inicia como esclavo con dirección 4 en la comunicación I2C
     Wire.onReceive(receiveEvent); //Interrupción habilitada cuando el maestro envía bytes en la comunicación I2C
     Wire.onRequest(sendEvent);
-    
+
     //*********************************************************************************************************//
     // Tomamos valores de presion del sistema con una interrupcion para graficar dicha presion
     //*********************************************************************************************************//
@@ -213,12 +219,21 @@ void loop()
         // Alarmas
         manejoAlarmas();
 
-        // Si todavia no fueron seteados los parametros llamar a la funcion
-        if (Pasos_Avance == 0)
-            CalcularParametros();
-
         // Graficos
         manejoGraficos();
+
+        if (ModoActual == PSV)
+        { // Modo Control Presion de Soporte PSV
+            if (ChequeoSoporteVolumenPresion())
+            {
+                cancelarDelay();        // corta el delay de expera entre los ciclo en el modo PSV
+            }
+            if (ModoSeleccionado != ModoActual && estaEnDelay())       // Cambia de modo de funcionamiento mientras esta en el intervalo de espera
+            {
+                ModoActual = ModoSeleccionado;
+                cancelarDelay();
+            }
+        }
 
         // Ciclo de funcionamiento
         manejoCiclo();
@@ -254,6 +269,12 @@ void manejoCiclo()
     switch (CicloActual)
     {
     case INSPIRACION:
+
+        if (ForzarCalculoInicioCiclo) {
+            CalcularParametros();
+            ForzarCalculoInicioCiclo = false;
+        }
+
         digitalWrite(dirPin, HIGH);
         if (Pasos_Actuales < Pasos_Avance)
         {
@@ -308,6 +329,14 @@ void manejoCiclo()
             Serial.println((millis() - Aux_Tiempo_Ciclo) / 1000.0);
             Aux_Tiempo_Ciclo = millis();
 
+            ModoActual = ModoSeleccionado;      // solo se cambia el modo de funcionamiento al final del ciclo
+            if (ModoActual == PSV)
+            {
+                delayMillis(PsvTiempoEspera * 1000);
+                ForzarCalculoInicioCiclo = true;
+                return;
+            }
+
             // Calcula los parametro para el siguiente ciclo
             CalcularParametros();
             delayMillis(1000);
@@ -340,22 +369,30 @@ void manejoAlarmas()
 void manejoGraficos()
 {
     // Chequear Intervalos para graficos
-//    if ((unsigned long)millis() - Aux_Presion_Grafica > Presion_Grafica_Intervalo)
-//    {
- //       if (Presion_Grafica())
-//            Aux_Presion_Grafica = millis();
-//    }
+    //    if ((unsigned long)millis() - Aux_Presion_Grafica > Presion_Grafica_Intervalo)
+    //    {
+    //       if (Presion_Grafica())
+    //            Aux_Presion_Grafica = millis();
+    //    }
 
-//    if ((unsigned long)millis() - Aux_Volumen_Grafica > Volumen_Grafica_Intervalo)
-//    {
-  //      if (Volumen_Grafica())
- //           Aux_Volumen_Grafica = millis();
- //   }
+    //    if ((unsigned long)millis() - Aux_Volumen_Grafica > Volumen_Grafica_Intervalo)
+    //    {
+    //      if (Volumen_Grafica())
+    //           Aux_Volumen_Grafica = millis();
+    //   }
 }
 
 //**********************************************************************************************************************************************//
 // Funcion de delay propia para no bloquear el loop principal y poder realizar operaciones secundarias                                                                              //
 //**********************************************************************************************************************************************//
+volatile bool Aux_En_Delay = false;
+unsigned long Aux_Delay_Time = 0;
+unsigned long Aux_Delay_Begin = 0;
+
+void cancelarDelay()
+{
+    Aux_En_Delay = false;
+}
 
 bool estaEnDelay()
 {
@@ -412,7 +449,7 @@ void receiveEvent(int cantBytes)
     byte18 = Wire.read();
     byte19 = Wire.read();
     byte20 = Wire.read();
-    
+
     unsigned int aux;
     // Velocidad de Inspiracion
     aux = (byte3 << 8) | byte4;               // Ajusta a parte fracionáia (depois da vírgula)
@@ -448,66 +485,73 @@ void receiveEvent(int cantBytes)
 
     //Inicio de Ciclo
     Modo_ON = (bool)byte17;
-   // if (Modo_ON)
-        AlarmaActual = SIN_ALARMA;
-   // Serial.print("Modo");
-   // Serial.println(Modo_ON);
+    // if (Modo_ON)
+    AlarmaActual = SIN_ALARMA;
+    // Serial.print("Modo");
+    // Serial.println(Modo_ON);
 
     //Porcentaje Volumen Tidal
     Vtidal = byte18;
 
     //Presión Trigger
     PTrigger = byte19 * -1; //Se multiplica´por -1 para obtener el valor de presión de trigger original ya que no se puede transmitir en negativo
-   // Serial.print("Presion Trigger:");
-   // Serial.println(PTrigger);
+                            // Serial.print("Presion Trigger:");
+                            // Serial.println(PTrigger);
 
     // Modo Seleccionado. 0= VCV, 1=PSV
-    Modo_Seleccionado = byte20;
+    if (byte20 == 0)
+    {
+        ModoSeleccionado = VCV;
+    }
+    else
+    {
+        ModoSeleccionado = PSV;
+    }
 
-   // Serial.print("Modo:");
-   // Serial.println(Modo_Seleccionado);
+    // Serial.print("Modo:");
+    // Serial.println(Modo_Seleccionado);
 }
 
 void sendEvent()
 {
-//if (Presion_PIP != Presion_PIP_Anterior )
-  // {
+    //if (Presion_PIP != Presion_PIP_Anterior )
+    // {
     byte byte1, byte2, byte3, byte4, byte5, byte6, byte7, byte8, byte9, byte10, byte11, byte12;
     unsigned int auxi;
 
     float Presion_PIP_Tx = Presion_PIP;
     auxi = (unsigned int)Presion_PIP_Tx; // aux = 46689, Pega somente a parte inteira da variável float (0 - 65536)
-    byte2 = auxi;                             // byte2 = 0B01100001, pega apenas os primeros 8 bits
-    byte1 = (auxi >> 8);                      // byte1 = 0B10110110, pega os 8 ultimos bits
+    byte2 = auxi;                        // byte2 = 0B01100001, pega apenas os primeros 8 bits
+    byte1 = (auxi >> 8);                 // byte1 = 0B10110110, pega os 8 ultimos bits
     // Ajustando o número depois da vírgula
     Presion_PIP_Tx -= auxi;              // Deixa apenas o número depois da vírgula
-    Presion_PIP_Tx *= 10000;            // Multiplica por 10k para pegar 4 dígitos após a vírgula
+    Presion_PIP_Tx *= 10000;             // Multiplica por 10k para pegar 4 dígitos após a vírgula
     auxi = (unsigned int)Presion_PIP_Tx; // Pega somente o valor antes da vírgula
-    byte4 = auxi;                             // byte2 = 0B00101110, pega apenas os primeros 8 bits
-    byte3 = (auxi >> 8);                      // byte1 = 0B00100010, pega os 8 ultimos bits
-    
+    byte4 = auxi;                        // byte2 = 0B00101110, pega apenas os primeros 8 bits
+    byte3 = (auxi >> 8);                 // byte1 = 0B00100010, pega os 8 ultimos bits
+
     float Presion_Plateau_Tx = Presion_Plateau;
     auxi = (unsigned int)Presion_Plateau_Tx; // aux = 46689, Pega somente a parte inteira da variável float (0 - 65536)
-    byte6 = auxi;                             // byte2 = 0B01100001, pega apenas os primeros 8 bits
-    byte5 = (auxi >> 8);                      // byte1 = 0B10110110, pega os 8 ultimos bits
+    byte6 = auxi;                            // byte2 = 0B01100001, pega apenas os primeros 8 bits
+    byte5 = (auxi >> 8);                     // byte1 = 0B10110110, pega os 8 ultimos bits
     // Ajustando o número depois da vírgula
     Presion_Plateau_Tx -= auxi;              // Deixa apenas o número depois da vírgula
-    Presion_Plateau_Tx *= 10000;            // Multiplica por 10k para pegar 4 dígitos após a vírgula
+    Presion_Plateau_Tx *= 10000;             // Multiplica por 10k para pegar 4 dígitos após a vírgula
     auxi = (unsigned int)Presion_Plateau_Tx; // Pega somente o valor antes da vírgula
-    byte8 = auxi;                             // byte2 = 0B00101110, pega apenas os primeros 8 bits
-    byte7 = (auxi >> 8);                      // byte1 = 0B00100010, pega os 8 ultimos bits
+    byte8 = auxi;                            // byte2 = 0B00101110, pega apenas os primeros 8 bits
+    byte7 = (auxi >> 8);                     // byte1 = 0B00100010, pega os 8 ultimos bits
 
     float Presion_PEEP_Tx = Presion_PEEP;
     auxi = (unsigned int)Presion_PEEP_Tx; // aux = 46689, Pega somente a parte inteira da variável float (0 - 65536)
-    byte10 = auxi;                             // byte2 = 0B01100001, pega apenas os primeros 8 bits
-    byte9 = (auxi >> 8);                      // byte1 = 0B10110110, pega os 8 ultimos bits
+    byte10 = auxi;                        // byte2 = 0B01100001, pega apenas os primeros 8 bits
+    byte9 = (auxi >> 8);                  // byte1 = 0B10110110, pega os 8 ultimos bits
     // Ajustando o número depois da vírgula
     Presion_PEEP_Tx -= auxi;              // Deixa apenas o número depois da vírgula
-    Presion_PEEP_Tx *= 10000;            // Multiplica por 10k para pegar 4 dígitos após a vírgula
+    Presion_PEEP_Tx *= 10000;             // Multiplica por 10k para pegar 4 dígitos após a vírgula
     auxi = (unsigned int)Presion_PEEP_Tx; // Pega somente o valor antes da vírgula
-    byte12 = auxi;                             // byte2 = 0B00101110, pega apenas os primeros 8 bits
-    byte11 = (auxi >> 8);                      // byte1 = 0B00100010, pega os 8 ultimos bits 
-    
+    byte12 = auxi;                        // byte2 = 0B00101110, pega apenas os primeros 8 bits
+    byte11 = (auxi >> 8);                 // byte1 = 0B00100010, pega os 8 ultimos bits
+
     Wire.write(byte1);
     Wire.write(byte2);
     Wire.write(byte3);
@@ -521,11 +565,9 @@ void sendEvent()
     Wire.write(byte11);
     Wire.write(byte12);
 
-    
- // }
+    // }
 
-//Presion_PIP_Anterior = Presion_PIP;
-
+    //Presion_PIP_Anterior = Presion_PIP;
 }
 
 //**********************************************************************************************************************************************//
@@ -610,6 +652,11 @@ bool ChequeoPEEP()
         return true;
     }
     return false;
+}
+
+bool ChequeoSoporteVolumenPresion()
+{
+    return (Presion() < PTrigger);
 }
 
 //**********************************************************************************************************************************************//
@@ -732,6 +779,7 @@ void IrAlInicio()
     Pasos_Avance = 0;
     Pasos_Actuales = 0;
     CicloActual = INSPIRACION;
+    ForzarCalculoInicioCiclo = true;
 }
 
 //**********************************************************************************************************************************************//
