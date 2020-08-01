@@ -8,7 +8,7 @@ typedef enum ModoOperacion
 {
     VCV,
     PSV
-}
+};
 
 typedef enum TipoDeCiclo
 {
@@ -39,7 +39,7 @@ float PEEP = 0;
 bool ForzarCalculoInicioCiclo = true;
 int Vtidal = 0;
 int PTrigger = 0;
-#define PsvTiempoEspera 15                          // Intervalo entre los ciclos espresado en segundos
+#define PsvTiempoEspera 15 // Intervalo entre los ciclos espresado en segundos
 
 //Enconder
 #define A 2                                           //variable A del econder a pin digital 2 (DT en modulo)
@@ -209,15 +209,16 @@ void loop()
     checkDelay();
 
     Posicion = myEncoder.read(); // read position
-                                 // Serial.print("Posicion:"); // print the position
+
+    // Serial.print("Posicion:"); // print the position
     //Serial.println(Posicion);
+
+    // Alarmas
+    manejoAlarmas();
 
     if (Modo_ON)
     {
         digitalWrite(Led_Marcha, HIGH);
-
-        // Alarmas
-        manejoAlarmas();
 
         // Graficos
         manejoGraficos();
@@ -226,9 +227,9 @@ void loop()
         { // Modo Control Presion de Soporte PSV
             if (ChequeoSoporteVolumenPresion())
             {
-                cancelarDelay();        // corta el delay de expera entre los ciclo en el modo PSV
+                cancelarDelay(); // corta el delay de expera entre los ciclo en el modo PSV
             }
-            if (ModoSeleccionado != ModoActual && estaEnDelay())       // Cambia de modo de funcionamiento mientras esta en el intervalo de espera
+            if (ModoSeleccionado != ModoActual && estaEnDelay()) // Cambia de modo de funcionamiento mientras esta en el intervalo de espera
             {
                 ModoActual = ModoSeleccionado;
                 cancelarDelay();
@@ -241,11 +242,7 @@ void loop()
     else
     {
 
-        if (AlarmaActual == ALARMA_PIP)
-        {
-            AlarmaContinua();
-        }
-        else
+        if (AlarmaActual != ALARMA_PIP)
         {
             SilenciarAlarma();
 
@@ -270,7 +267,8 @@ void manejoCiclo()
     {
     case INSPIRACION:
 
-        if (ForzarCalculoInicioCiclo) {
+        if (ForzarCalculoInicioCiclo)
+        {
             CalcularParametros();
             ForzarCalculoInicioCiclo = false;
         }
@@ -329,7 +327,7 @@ void manejoCiclo()
             Serial.println((millis() - Aux_Tiempo_Ciclo) / 1000.0);
             Aux_Tiempo_Ciclo = millis();
 
-            ModoActual = ModoSeleccionado;      // solo se cambia el modo de funcionamiento al final del ciclo
+            ModoActual = ModoSeleccionado; // solo se cambia el modo de funcionamiento al final del ciclo
             if (ModoActual == PSV)
             {
                 delayMillis(PsvTiempoEspera * 1000);
@@ -357,6 +355,9 @@ void manejoAlarmas()
         break;
     case ALARMA_PEEP:
         AlarmaIntermitente();
+        break;
+    case ALARMA_MECANICA:
+        AlarmaContinua();
         break;
     case SIN_ALARMA:
         SilenciarAlarma();
@@ -427,7 +428,7 @@ void delayMillis(unsigned long time)
 //**********************************************************************************************************************************************//
 void receiveEvent(int cantBytes)
 { // Está código é executado quando "quantidade_bytes_esperados" foi recebido via I2C
-    byte byte1, byte2, byte3, byte4, byte5, byte6, byte7, byte8, byte9, byte10, byte11, byte12, byte13, byte14, byte15, byte16, byte17, byte18, byte19, byte20;
+    byte byte1, byte2, byte3, byte4, byte5, byte6, byte7, byte8, byte9, byte10, byte11, byte12, byte13, byte14, byte15, byte16, byte17, byte18, byte19, byte20, byte21;
 
     byte1 = Wire.read(); // Lê os 4 bytes enviados pelo mestre
     byte2 = Wire.read();
@@ -449,6 +450,7 @@ void receiveEvent(int cantBytes)
     byte18 = Wire.read();
     byte19 = Wire.read();
     byte20 = Wire.read();
+    byte21 = Wire.read();
 
     unsigned int aux;
     // Velocidad de Inspiracion
@@ -485,8 +487,6 @@ void receiveEvent(int cantBytes)
 
     //Inicio de Ciclo
     Modo_ON = (bool)byte17;
-    // if (Modo_ON)
-    AlarmaActual = SIN_ALARMA;
     // Serial.print("Modo");
     // Serial.println(Modo_ON);
 
@@ -508,6 +508,9 @@ void receiveEvent(int cantBytes)
         ModoSeleccionado = PSV;
     }
 
+    // Alarmas
+    AlarmaActual = byte21;
+
     // Serial.print("Modo:");
     // Serial.println(Modo_Seleccionado);
 }
@@ -516,7 +519,7 @@ void sendEvent()
 {
     //if (Presion_PIP != Presion_PIP_Anterior )
     // {
-    byte byte1, byte2, byte3, byte4, byte5, byte6, byte7, byte8, byte9, byte10, byte11, byte12;
+    byte byte1, byte2, byte3, byte4, byte5, byte6, byte7, byte8, byte9, byte10, byte11, byte12, byte13;
     unsigned int auxi;
 
     float Presion_PIP_Tx = Presion_PIP;
@@ -551,6 +554,9 @@ void sendEvent()
     auxi = (unsigned int)Presion_PEEP_Tx; // Pega somente o valor antes da vírgula
     byte12 = auxi;                        // byte2 = 0B00101110, pega apenas os primeros 8 bits
     byte11 = (auxi >> 8);                 // byte1 = 0B00100010, pega os 8 ultimos bits
+
+    // Informar el estado de las alarmas
+    byte13 = AlarmaActual;
 
     Wire.write(byte1);
     Wire.write(byte2);
@@ -647,7 +653,6 @@ bool ChequeoPEEP()
     if (Presion_PIP > PMAX)
     {
         InformarAlarma(ALARMA_PEEP);
-        IrAlInicio();
         AlarmaActual = ALARMA_PEEP;
         return true;
     }
