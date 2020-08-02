@@ -220,6 +220,9 @@ void loop()
     {
         digitalWrite(Led_Marcha, HIGH);
 
+        if (Pasos_Avance == 0)
+            CalcularParametros();
+
         // Graficos
         manejoGraficos();
 
@@ -506,6 +509,8 @@ void receiveEvent(int cantBytes)
     else
     {
         ModoSeleccionado = PSV;
+        delayMillis(PsvTiempoEspera * 1000);
+        ForzarCalculoInicioCiclo = true;
     }
 
     // Alarmas
