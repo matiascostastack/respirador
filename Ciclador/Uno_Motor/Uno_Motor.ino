@@ -8,7 +8,7 @@ typedef enum ModoOperacion
 {
     VCV,
     PSV
-}
+};
 
 typedef enum TipoDeCiclo
 {
@@ -39,7 +39,7 @@ float PEEP = 0;
 bool ForzarCalculoInicioCiclo = true;
 int Vtidal = 0;
 int PTrigger = 0;
-#define PsvTiempoEspera 15                          // Intervalo entre los ciclos espresado en segundos
+#define PsvTiempoEspera 15 // Intervalo entre los ciclos espresado en segundos
 
 //Enconder
 #define A 2                                           //variable A del econder a pin digital 2 (DT en modulo)
@@ -216,6 +216,11 @@ void loop()
     {
         digitalWrite(Led_Marcha, HIGH);
 
+        if (Pasos_Avance == 0)
+        {
+            CalcularParametros();
+        }
+
         // Alarmas
         manejoAlarmas();
 
@@ -226,9 +231,9 @@ void loop()
         { // Modo Control Presion de Soporte PSV
             if (ChequeoSoporteVolumenPresion())
             {
-                cancelarDelay();        // corta el delay de expera entre los ciclo en el modo PSV
+                cancelarDelay(); // corta el delay de expera entre los ciclo en el modo PSV
             }
-            if (ModoSeleccionado != ModoActual && estaEnDelay())       // Cambia de modo de funcionamiento mientras esta en el intervalo de espera
+            if (ModoSeleccionado != ModoActual && estaEnDelay()) // Cambia de modo de funcionamiento mientras esta en el intervalo de espera
             {
                 ModoActual = ModoSeleccionado;
                 cancelarDelay();
@@ -270,7 +275,8 @@ void manejoCiclo()
     {
     case INSPIRACION:
 
-        if (ForzarCalculoInicioCiclo) {
+        if (ForzarCalculoInicioCiclo)
+        {
             CalcularParametros();
             ForzarCalculoInicioCiclo = false;
         }
@@ -329,7 +335,7 @@ void manejoCiclo()
             Serial.println((millis() - Aux_Tiempo_Ciclo) / 1000.0);
             Aux_Tiempo_Ciclo = millis();
 
-            ModoActual = ModoSeleccionado;      // solo se cambia el modo de funcionamiento al final del ciclo
+            ModoActual = ModoSeleccionado; // solo se cambia el modo de funcionamiento al final del ciclo
             if (ModoActual == PSV)
             {
                 delayMillis(PsvTiempoEspera * 1000);
@@ -506,6 +512,8 @@ void receiveEvent(int cantBytes)
     else
     {
         ModoSeleccionado = PSV;
+        delayMillis(PsvTiempoEspera * 1000);
+        ForzarCalculoInicioCiclo = true;
     }
 
     // Serial.print("Modo:");
