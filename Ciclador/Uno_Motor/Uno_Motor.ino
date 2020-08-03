@@ -36,7 +36,6 @@ float Velo_Expiracion = 0.0;
 float PMAX = 0;
 float PEEP = 0;
 
-bool ForzarCalculoInicioCiclo = true;
 int Vtidal = 0;
 int PTrigger = 0;
 #define PsvTiempoEspera 15 // Intervalo entre los ciclos espresado en segundos
@@ -231,11 +230,13 @@ void loop()
         { // Modo Control Presion de Soporte PSV
             if (ChequeoSoporteVolumenPresion())
             {
+                CalcularParametros();
                 cancelarDelay(); // corta el delay de expera entre los ciclo en el modo PSV
             }
             if (ModoSeleccionado != ModoActual && estaEnDelay()) // Cambia de modo de funcionamiento mientras esta en el intervalo de espera
             {
                 ModoActual = ModoSeleccionado;
+                CalcularParametros();
                 cancelarDelay();
             }
         }
@@ -274,12 +275,6 @@ void manejoCiclo()
     switch (CicloActual)
     {
     case INSPIRACION:
-
-        if (ForzarCalculoInicioCiclo)
-        {
-            CalcularParametros();
-            ForzarCalculoInicioCiclo = false;
-        }
 
         digitalWrite(dirPin, HIGH);
         if (Pasos_Actuales < Pasos_Avance)
@@ -339,7 +334,6 @@ void manejoCiclo()
             if (ModoActual == PSV)
             {
                 delayMillis(PsvTiempoEspera * 1000);
-                ForzarCalculoInicioCiclo = true;
                 return;
             }
 
@@ -513,7 +507,7 @@ void receiveEvent(int cantBytes)
     {
         ModoSeleccionado = PSV;
         delayMillis(PsvTiempoEspera * 1000);
-        ForzarCalculoInicioCiclo = true;
+        CalcularParametros();
     }
 
     // Serial.print("Modo:");
@@ -787,7 +781,6 @@ void IrAlInicio()
     Pasos_Avance = 0;
     Pasos_Actuales = 0;
     CicloActual = INSPIRACION;
-    ForzarCalculoInicioCiclo = true;
 }
 
 //**********************************************************************************************************************************************//
