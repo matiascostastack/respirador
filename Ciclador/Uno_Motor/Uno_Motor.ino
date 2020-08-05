@@ -220,27 +220,37 @@ void loop()
             CalcularParametros();
         }
 
+        if ((ModoActual != ModoSeleccionado) && (Pasos_Actuales == 0))
+        {
+          ModoActual = ModoSeleccionado;
+          CalcularParametros();
+          if(ModoActual==PSV)
+          {
+           delayMillis(PsvTiempoEspera * 1000);
+          }
+        }
+        
         // Alarmas
         manejoAlarmas();
 
         // Graficos
         manejoGraficos();
 
-        if (ModoActual == PSV)
-        { // Modo Control Presion de Soporte PSV
-            if (ChequeoSoporteVolumenPresion())
-            {
-                CalcularParametros();
-                cancelarDelay(); // corta el delay de expera entre los ciclo en el modo PSV
-            }
-            if (ModoSeleccionado != ModoActual && estaEnDelay()) // Cambia de modo de funcionamiento mientras esta en el intervalo de espera
+         if (ModoActual == PSV && estaEnDelay() && Pasos_Actuales == 0 && CicloActual == INSPIRACION)
+         { // Modo Control Presion de Soporte PSV
+             if (ChequeoSoporteVolumenPresion())
+             {
+              //   CalcularParametros();
+                 cancelarDelay(); // corta el delay de expera entre los ciclo en el modo PSV
+             }
+             if (ModoSeleccionado != ModoActual && estaEnDelay()) // Cambia de modo de funcionamiento mientras esta en el intervalo de espera
             {
                 ModoActual = ModoSeleccionado;
                 CalcularParametros();
                 cancelarDelay();
             }
-        }
-
+         }
+   
         // Ciclo de funcionamiento
         manejoCiclo();
     }
@@ -329,7 +339,7 @@ void manejoCiclo()
             Serial.print("Tiempo Expiracion: ");
             Serial.println((millis() - Aux_Tiempo_Ciclo) / 1000.0);
             Aux_Tiempo_Ciclo = millis();
-
+            CalcularParametros();
             ModoActual = ModoSeleccionado; // solo se cambia el modo de funcionamiento al final del ciclo
             if (ModoActual == PSV)
             {
@@ -338,7 +348,7 @@ void manejoCiclo()
             }
 
             // Calcula los parametro para el siguiente ciclo
-            CalcularParametros();
+            
             delayMillis(1000);
         }
         break;
@@ -392,6 +402,8 @@ unsigned long Aux_Delay_Begin = 0;
 void cancelarDelay()
 {
     Aux_En_Delay = false;
+    Aux_Delay_Time = 0;
+    Aux_Delay_Begin = 0;
 }
 
 bool estaEnDelay()
@@ -406,9 +418,7 @@ void checkDelay()
 
     if ((unsigned long)millis() - Aux_Delay_Begin >= Aux_Delay_Time)
     {
-        Aux_En_Delay = false;
-        Aux_Delay_Time = 0;
-        Aux_Delay_Begin = 0;
+    cancelarDelay();
     }
 }
 
@@ -506,8 +516,8 @@ void receiveEvent(int cantBytes)
     else
     {
         ModoSeleccionado = PSV;
-        delayMillis(PsvTiempoEspera * 1000);
-        CalcularParametros();
+      //  delayMillis(PsvTiempoEspera * 1000);
+      //  CalcularParametros();
     }
 
     // Serial.print("Modo:");
@@ -658,7 +668,7 @@ bool ChequeoPEEP()
 
 bool ChequeoSoporteVolumenPresion()
 {
-    return (Presion() < PTrigger);
+   return (Presion() < (float)PTrigger);
 }
 
 //**********************************************************************************************************************************************//
