@@ -4,12 +4,23 @@
 #include <Encoder.h>
 
 //#include <LiquidCrystal.h>
+typedef enum TipoDeAlarma
+{
+  ALARMA_PIP,
+  ALARMA_PEEP,
+  ALARMA_MECANICA,
+  SIN_ALARMA
+};
+TipoDeAlarma AlarmaActual = SIN_ALARMA;
 
 // Encoder
 Encoder myEnc(2, 4);
 
 // Pantalla
 LiquidCrystal_I2C lcd(0x27, 2, 1, 0, 4, 5, 6, 7); // Inicializa el LCD con DIR, E, RW, RS, D4, D5, D6, D7)
+
+// Led de Alarmas
+#define Led_ALarmas 12
 
 // Pulsador Pantalla
 #define Pulsador_Pantalla 5               // Seleccion de entrada para Pulsador navegar en pantallas
@@ -37,7 +48,6 @@ int Contador_IE = 0;
 bool Cambio_Opcion_Pantalla = true;
 int Valor_Actual_Pantalla = 0;
 
-
 int BPM_Seleccionado = 26;
 int IE_Seleccionado = 0;
 int PMAX_Seleccionado = 40;
@@ -49,7 +59,6 @@ int Vtidal_Seleccionado_Anterior = 40;
 int Vtidal_Seleccionado_LCD = 700; //500ml
 int Ptrigger_Seleccionado = -5;
 int Ptrigger_Seleccionado_Anterior = -5;
-
 
 float Tciclo = 0.0;
 float Tinspiracion = 0.0;
@@ -70,14 +79,18 @@ volatile bool Cambio_Modo = false; // Indica si hubo un cambio de estado que nec
 int Modo_Seleccionado = 0; //0- Modo Control por Volumen VCV, 1= Modo Control Presion de Soporte PSV
 int Modo_Seleccionado_Anterior = 0;
 
-float Sensibilidad_Sensor_Corriente = 0.100; 
+float Sensibilidad_Sensor_Corriente = 0.100;
 float ruido = 0.0;
 float ValorReposo = 2.5;
 float IntensidadPico_A = 0.0;
 float IntensidadPico_B = 0.0;
-
+float Intervalo_Lectura_Sensor_Corriente = 1000;
+#define Alarma_SensorCorriente_Aviso 2.5
+#define Alarma_SensorCorriente_Parada 3
 int sensorIntensidad_A = A0;
 int sensorIntensidad_B = A1;
+
+unsigned long Aux_Delay_Lectura_Sensor_Corriente = 0;
 
 //*********************************************************************************************************//
 // SETUP
@@ -93,6 +106,8 @@ void setup()
   pinMode(Pulsador_Pantalla, INPUT);  //Le digo que el pin valor, 2 es una entrada digital
   pinMode(Pulsador_Seleccion, INPUT); //Le digo que el pin valor, 3 es una entrada digital
   pinMode(Pulsador_Marcha, INPUT);
+
+  pinMode(Led_ALarmas, OUTPUT);
 
   //attachInterrupt( 5, Pulsador_Marcha, RISING); //Defino interrupcion 5 Pin 18 para el pulsador de marcha
   attachInterrupt(1, Pulsador_Parada, CHANGE); //Defino interrupcion 6 Pin 19 para pulsador de parada
@@ -138,150 +153,168 @@ void loop()
   }
   Pulsador_Pantalla_Anterior_VALUE = Pulsador_Pantalla_VALUE;
 
-  switch (Contador_Pantalla)
+  //**********************************************************************//
+  // Si hay alarma la muestra en pantalla
+  //**********************************************************************//
+  if (AlarmaActual != SIN_ALARMA)
   {
-
-//**********************************************************************//
-  
-  case 0:
-    if (Cambio_Opcion_Pantalla)
-    {
-      Valor_Actual_Pantalla = Modo_Seleccionado;
-      Cambio_Opcion_Pantalla = false;
-    }
-    NewModo(addEndoderValue);
     if (Pulsador_Seleccion_VALUE == HIGH)
     {
-      SetModo(Valor_Actual_Pantalla);
+      // Resetear la alarma
+      AlarmaActual = SIN_ALARMA;
+      digitalWrite(Led_ALarmas, LOW);
     }
-    break;
-//*******************************************************************//
- 
-  case 1:
-    if (Cambio_Opcion_Pantalla)
-    {
-      Valor_Actual_Pantalla = BPM_Seleccionado;
-      Cambio_Opcion_Pantalla = false;
-    }
-    NewBpm(addEndoderValue);
-    if (Pulsador_Seleccion_VALUE == HIGH)
-    {
-      SetBpm(Valor_Actual_Pantalla);
-    }
-    break;
+    ManejoAlarmas();
+    MostrarAlarmaEnDisplay();
+  }
+  else
+  {
+    //**********************************************************************//
+    // Si NO hay alarmas se muestra la opcion seleccionada
+    //**********************************************************************//
 
-  case 2:
-    if (Cambio_Opcion_Pantalla)
+    switch (Contador_Pantalla)
     {
-      Valor_Actual_Pantalla = Contador_IE;
-      Cambio_Opcion_Pantalla = false;
-    }
-    NewIE(addEndoderValue);
-    if (Pulsador_Seleccion_VALUE == HIGH)
-    {
-      SetIE(Valor_Actual_Pantalla);
-    }
-    break;
+    //**********************************************************************//
+    case 0:
+      if (Cambio_Opcion_Pantalla)
+      {
+        Valor_Actual_Pantalla = Modo_Seleccionado;
+        Cambio_Opcion_Pantalla = false;
+      }
+      NewModo(addEndoderValue);
+      if (Pulsador_Seleccion_VALUE == HIGH)
+      {
+        SetModo(Valor_Actual_Pantalla);
+      }
+      break;
+      //*******************************************************************//
 
-  case 3:
-    if (Cambio_Opcion_Pantalla)
-    {
-      Valor_Actual_Pantalla = PMAX_Seleccionado;
-      Cambio_Opcion_Pantalla = false;
-    }
-    NewPmax(addEndoderValue);
-    if (Pulsador_Seleccion_VALUE == HIGH)
-    {
-      SetPmax(Valor_Actual_Pantalla);
-    }
-    break;
-
-  case 4:
-    if (Cambio_Opcion_Pantalla)
-    {
-      Valor_Actual_Pantalla = PEEP_Seleccionado;
-      Cambio_Opcion_Pantalla = false;
-    }
-    NewPeep(addEndoderValue);
-    if (Pulsador_Seleccion_VALUE == HIGH)
-    {
-      SetPeep(Valor_Actual_Pantalla);
-    }
-    break;
-
-   case 5:
-    if (Cambio_Opcion_Pantalla)
-    {
-      Valor_Actual_Pantalla = Vtidal_Seleccionado;
-      Cambio_Opcion_Pantalla = false;
-    }
-    NewVtidal(addEndoderValue);
-    if (Pulsador_Seleccion_VALUE == HIGH)
-    {
-      SetVtidal(Valor_Actual_Pantalla);
-    }
-    break;
-
-  case 6:
-    if (Cambio_Opcion_Pantalla)
-    {
-      Valor_Actual_Pantalla = Ptrigger_Seleccionado;
-      Cambio_Opcion_Pantalla = false;
-    }
-    NewPtrigger(addEndoderValue);
-    if (Pulsador_Seleccion_VALUE == HIGH)
-    {
-      SetPtrigger(Valor_Actual_Pantalla);
-    }
-    break;
-
-  case 7:
-    // Lee los valores sensados solo si necesita mostrarlos en la pantalla
-    if (estaEnDelay())
+    case 1:
+      if (Cambio_Opcion_Pantalla)
+      {
+        Valor_Actual_Pantalla = BPM_Seleccionado;
+        Cambio_Opcion_Pantalla = false;
+      }
+      NewBpm(addEndoderValue);
+      if (Pulsador_Seleccion_VALUE == HIGH)
+      {
+        SetBpm(Valor_Actual_Pantalla);
+      }
       break;
 
-    LeerValoresSensados();
+    case 2:
+      if (Cambio_Opcion_Pantalla)
+      {
+        Valor_Actual_Pantalla = Contador_IE;
+        Cambio_Opcion_Pantalla = false;
+      }
+      NewIE(addEndoderValue);
+      if (Pulsador_Seleccion_VALUE == HIGH)
+      {
+        SetIE(Valor_Actual_Pantalla);
+      }
+      break;
 
-    lcd.setCursor(0, 0);
-    lcd.print("PIP:"); // Escribimos el Mensaje en el LCD.
-    lcd.setCursor(4, 0);
-    lcd.print(LCD_Presion_PIP); // Escribimos el Mensaje en el LCD.
-    lcd.setCursor(8, 0);
-    lcd.print(" PL:"); // Escribimos el Mensaje en el LCD.
-    lcd.setCursor(12, 0);
-    lcd.print(LCD_Presion_Plateau); // Escribimos el Mensaje en el LCD.
-    lcd.setCursor(0, 1);
-    lcd.print("PEEP:"); // Escribimos el Mensaje en el LCD.
-    lcd.setCursor(5, 1);
-    lcd.print(LCD_Presion_PEEP); // Escribimos el Mensaje en el LCD.
-    lcd.setCursor(9, 1);
-    lcd.print("[cmH2O]"); // Escribimos el Mensaje en el LCD.
+    case 3:
+      if (Cambio_Opcion_Pantalla)
+      {
+        Valor_Actual_Pantalla = PMAX_Seleccionado;
+        Cambio_Opcion_Pantalla = false;
+      }
+      NewPmax(addEndoderValue);
+      if (Pulsador_Seleccion_VALUE == HIGH)
+      {
+        SetPmax(Valor_Actual_Pantalla);
+      }
+      break;
 
-    delayMillis(250);
+    case 4:
+      if (Cambio_Opcion_Pantalla)
+      {
+        Valor_Actual_Pantalla = PEEP_Seleccionado;
+        Cambio_Opcion_Pantalla = false;
+      }
+      NewPeep(addEndoderValue);
+      if (Pulsador_Seleccion_VALUE == HIGH)
+      {
+        SetPeep(Valor_Actual_Pantalla);
+      }
+      break;
 
-    break;
+    case 5:
+      if (Cambio_Opcion_Pantalla)
+      {
+        Valor_Actual_Pantalla = Vtidal_Seleccionado;
+        Cambio_Opcion_Pantalla = false;
+      }
+      NewVtidal(addEndoderValue);
+      if (Pulsador_Seleccion_VALUE == HIGH)
+      {
+        SetVtidal(Valor_Actual_Pantalla);
+      }
+      break;
 
-  case 8:
-    // Pantalla realizada para visulaziar los valores de Tcliclo, Tinsp, Texp, Pmax y PEER !!!!!BORRAR!!!!!
-    lcd.setCursor(0, 0);
-    lcd.print(Tciclo); // Escribimos el Mensaje en el LCD.
-    lcd.setCursor(5, 0);
-    lcd.print(Tinspiracion); // Escribimos el Mensaje en el LCD.
-    lcd.setCursor(10, 0);
-    lcd.print(Texpiracion); // Escribimos el Mensaje en el LCD.
-    lcd.setCursor(0, 1);
-    lcd.print(PMAX_Seleccionado); // Escribimos el Mensaje en el LCD.
-    lcd.setCursor(5, 1);
-    lcd.print(PEEP_Seleccionado); // Escribimos el Mensaje en el LCD.
-    lcd.setCursor(8, 1);
-    lcd.print(Pulsador_Seleccion_VALUE); // Escribimos el Mensaje en el LCD.
-    break;
+    case 6:
+      if (Cambio_Opcion_Pantalla)
+      {
+        Valor_Actual_Pantalla = Ptrigger_Seleccionado;
+        Cambio_Opcion_Pantalla = false;
+      }
+      NewPtrigger(addEndoderValue);
+      if (Pulsador_Seleccion_VALUE == HIGH)
+      {
+        SetPtrigger(Valor_Actual_Pantalla);
+      }
+      break;
 
-  case 9:
-    Contador_Pantalla = 0;
-    break;
+    case 7:
+      // Lee los valores sensados solo si necesita mostrarlos en la pantalla
+      if (estaEnDelay())
+        break;
+
+      LeerValoresSensados();
+
+      lcd.setCursor(0, 0);
+      lcd.print("PIP:"); // Escribimos el Mensaje en el LCD.
+      lcd.setCursor(4, 0);
+      lcd.print(LCD_Presion_PIP); // Escribimos el Mensaje en el LCD.
+      lcd.setCursor(8, 0);
+      lcd.print(" PL:"); // Escribimos el Mensaje en el LCD.
+      lcd.setCursor(12, 0);
+      lcd.print(LCD_Presion_Plateau); // Escribimos el Mensaje en el LCD.
+      lcd.setCursor(0, 1);
+      lcd.print("PEEP:"); // Escribimos el Mensaje en el LCD.
+      lcd.setCursor(5, 1);
+      lcd.print(LCD_Presion_PEEP); // Escribimos el Mensaje en el LCD.
+      lcd.setCursor(9, 1);
+      lcd.print("[cmH2O]"); // Escribimos el Mensaje en el LCD.
+
+      delayMillis(250);
+
+      break;
+
+    case 8:
+      // Pantalla realizada para visulaziar los valores de Tcliclo, Tinsp, Texp, Pmax y PEER !!!!!BORRAR!!!!!
+      lcd.setCursor(0, 0);
+      lcd.print(Tciclo); // Escribimos el Mensaje en el LCD.
+      lcd.setCursor(5, 0);
+      lcd.print(Tinspiracion); // Escribimos el Mensaje en el LCD.
+      lcd.setCursor(10, 0);
+      lcd.print(Texpiracion); // Escribimos el Mensaje en el LCD.
+      lcd.setCursor(0, 1);
+      lcd.print(PMAX_Seleccionado); // Escribimos el Mensaje en el LCD.
+      lcd.setCursor(5, 1);
+      lcd.print(PEEP_Seleccionado); // Escribimos el Mensaje en el LCD.
+      lcd.setCursor(8, 1);
+      lcd.print(Pulsador_Seleccion_VALUE); // Escribimos el Mensaje en el LCD.
+      break;
+
+    case 9:
+      Contador_Pantalla = 0;
+      break;
+    }
   }
-
   //********************************************************************************************************************************//
   // Calculo de los valores necesarios para el funiconamiento en el ciclo de respiración                                            //
   // int BPM_Seleccionado contiene el valor seleccionado para los ciclos por minuto                                                 //
@@ -318,6 +351,24 @@ void loop()
   Velo_Inspiracion = Tinspiracion; //Paso el valor la cuenta la realizo en el otro arduino (UNO)
   Velo_Expiracion = Texpiracion;   // Paso el valor, la cuenta la realizo en el otro arduino (UNO)
 
+  //*******************************************************************************************************************************
+  // Toma lecturas de corriente bobinas del motor (Hacer una interrupcion para medir la corriente cada 1 seg)
+  //*********************************************************************************************************************************
+  if ((unsigned long)millis() - Aux_Delay_Lectura_Sensor_Corriente >= Intervalo_Lectura_Sensor_Corriente)
+  {
+    IntensidadPico_A = Corriente_Sensor_A(); //Funcion para llamar a la lectura de corriente en la Bobina A del motor paso a paso.
+    IntensidadPico_B = Corriente_Sensor_B(); //Funcion para llamar a la lectura de corriente en la Bobina A del motor paso a paso.
+    Aux_Delay_Lectura_Sensor_Corriente = millis();
+    if (IntensidadPico_A > Alarma_SensorCorriente_Aviso || IntensidadPico_B > Alarma_SensorCorriente_Aviso)
+    {
+      AlarmaActual = ALARMA_MECANICA;
+      if (IntensidadPico_A > Alarma_SensorCorriente_Parada || IntensidadPico_B > Alarma_SensorCorriente_Parada)
+      {
+        Modo_ON = false;
+      }
+    }
+  }
+
   //************************************************************************************************************************//
   // Comunicacion I2c entre Mega (Maestro) y Uno (Esclavo)                                                                  //
   // Datos Transmitidos: Velocidad de Inspiracion, Velocidad de Expiracion, Presion maxima y PEEP                           //
@@ -326,10 +377,10 @@ void loop()
 
   //
 
-  if ((Velo_Inspiracion != Velo_Inspiracion_Anterior) || (Velo_Expiracion != Velo_Expiracion_Anterior) || (PMAX_Seleccionado != PMAX_Seleccionado_Anterior) || (PEEP_Seleccionado != PEEP_Seleccionado_Anterior) || (Vtidal_Seleccionado != Vtidal_Seleccionado_Anterior) || Cambio_Modo || Ptrigger_Seleccionado != Ptrigger_Seleccionado_Anterior || Modo_Seleccionado != Modo_Seleccionado_Anterior)
+  if ((Velo_Inspiracion != Velo_Inspiracion_Anterior) || (Velo_Expiracion != Velo_Expiracion_Anterior) || (PMAX_Seleccionado != PMAX_Seleccionado_Anterior) || (PEEP_Seleccionado != PEEP_Seleccionado_Anterior) || (Vtidal_Seleccionado != Vtidal_Seleccionado_Anterior) || Cambio_Modo || Ptrigger_Seleccionado != Ptrigger_Seleccionado_Anterior || Modo_Seleccionado != Modo_Seleccionado_Anterior || AlarmaActual != SIN_ALARMA)
   // (Pulsador_Marcha_VALUE == digitalRead(19))
   {
-    byte byte1, byte2, byte3, byte4, byte5, byte6, byte7, byte8, byte9, byte10, byte11, byte12, byte13, byte14, byte15, byte16, byte17, byte18, byte19, byte20;
+    byte byte1, byte2, byte3, byte4, byte5, byte6, byte7, byte8, byte9, byte10, byte11, byte12, byte13, byte14, byte15, byte16, byte17, byte18, byte19, byte20, byte21;
     unsigned int aux;
 
     // Se envia Velocidad de Inspiracion
@@ -393,6 +444,9 @@ void loop()
     //Envio el Modo de funcionamiento 0=VCV y 1=PSC
     byte20 = Modo_Seleccionado;
 
+    //Envio el estado de las Alarmas
+    byte21 = AlarmaActual;
+
     //Inicia transmision de Bytes
     Wire.beginTransmission(4); // Começa transmissão para o escravo 0x2C
     Wire.write(byte1);         // Envia os bytes do número antes da vírgua e depois da vírgula
@@ -415,6 +469,7 @@ void loop()
     Wire.write(byte18);
     Wire.write(byte19);
     Wire.write(byte20);
+    Wire.write(byte21);
     Wire.endTransmission(); // Termina a transmissão
   }
 
@@ -426,14 +481,6 @@ void loop()
   Ptrigger_Seleccionado_Anterior = Ptrigger_Seleccionado;
   Modo_Seleccionado_Anterior = Modo_Seleccionado;
   Cambio_Modo = false;
-
-//*******************************************************************************************************************************
-// Toma lecturas de corriente bobinas del motor (Hacer una interrupcion para medir la corriente cada 1 seg)
-//*********************************************************************************************************************************
-//IntensidadPico_A = Corriente_Sensor_A();   //Funcion para llamar a la lectura de corriente en la Bobina A del motor paso a paso.
-//IntensidadPico_B = Corriente_Sensor_B();   //Funcion para llamar a la lectura de corriente en la Bobina A del motor paso a paso.
-//Mostrar_Corriente_A();
-
 }
 
 //*******************************************************************************//
@@ -442,36 +489,28 @@ void loop()
 
 float Corriente_Sensor_A()
 {
-float Lectura_A = 0;
-float Corriente_Motor_A = 0;
-long tiempo = millis();
-float intensidadMaxima_A = 0.0;
-float intensidadMinima_A = 0.0;
-while (millis()-tiempo<500)
-    {
-     Lectura_A = analogRead(sensorIntensidad_A)*(5.0 / 1023.0);
-     Corriente_Motor_A = 0.9*Corriente_Motor_A+0.1*(( Lectura_A - ValorReposo)/Sensibilidad_Sensor_Corriente);
-     if(Corriente_Motor_A > intensidadMaxima_A)intensidadMaxima_A = Corriente_Motor_A; 
-     if(Corriente_Motor_A < intensidadMinima_A)intensidadMinima_A = Corriente_Motor_A; 
-     }
-return (((intensidadMaxima_A-intensidadMinima_A)/2)- ruido);
+  float intensidadMaxima_A = 0.0;
+  float intensidadMinima_A = 0.0;
+  float Lectura_A = analogRead(sensorIntensidad_A) * (5.0 / 1023.0);
+  float Corriente_Motor_A = 0.9 * Corriente_Motor_A + 0.1 * ((Lectura_A - ValorReposo) / Sensibilidad_Sensor_Corriente);
+  if (Corriente_Motor_A > intensidadMaxima_A)
+    intensidadMaxima_A = Corriente_Motor_A;
+  if (Corriente_Motor_A < intensidadMinima_A)
+    intensidadMinima_A = Corriente_Motor_A;
+  return (((intensidadMaxima_A - intensidadMinima_A) / 2) - ruido);
 }
 
 float Corriente_Sensor_B()
 {
-float Lectura_B = 0;
-float Corriente_Motor_B = 0;
-long tiempo = millis();
-float intensidadMaxima_B = 0.0;
-float intensidadMinima_B = 0.0;
-while (millis()-tiempo<500)
-    {
-     Lectura_B = analogRead(sensorIntensidad_B)*(5.0 / 1023.0);
-     Corriente_Motor_B = 0.9*Corriente_Motor_B+0.1*(( Lectura_B - ValorReposo)/Sensibilidad_Sensor_Corriente);
-     if(Corriente_Motor_B > intensidadMaxima_B)intensidadMaxima_B = Corriente_Motor_B; 
-     if(Corriente_Motor_B < intensidadMinima_B)intensidadMinima_B = Corriente_Motor_B; 
-     }
-return (((intensidadMaxima_B-intensidadMinima_B)/2)- ruido);
+  float intensidadMaxima_B = 0.0;
+  float intensidadMinima_B = 0.0;
+  float Lectura_B = analogRead(sensorIntensidad_B) * (5.0 / 1023.0);
+  float Corriente_Motor_B = 0.9 * Corriente_Motor_B + 0.1 * ((Lectura_B - ValorReposo) / Sensibilidad_Sensor_Corriente);
+  if (Corriente_Motor_B > intensidadMaxima_B)
+    intensidadMaxima_B = Corriente_Motor_B;
+  if (Corriente_Motor_B < intensidadMinima_B)
+    intensidadMinima_B = Corriente_Motor_B;
+  return (((intensidadMaxima_B - intensidadMinima_B) / 2) - ruido);
 }
 
 //void Mostrar_Corriente_A()
@@ -481,9 +520,8 @@ return (((intensidadMaxima_B-intensidadMinima_B)/2)- ruido);
 //Serial.println(IntensidadPico,3);
 //Serial.print("Irms:");
 //Serial.println(irms,3);
- //delay(100);
+//delay(100);
 //}
-
 
 //**********************************************************************************************************************************************//
 // Funcion de delay propia para no bloquear el loop principal y poder realizar operaciones secundarias                                                                              //
@@ -545,7 +583,7 @@ void Pulsador_Parada()
 void LeerValoresSensados()
 {
   Wire.requestFrom(4, 12); //4,4 significa nodo 4, 4 bytes
-  byte Rx_slave1, Rx_slave2, Rx_slave3, Rx_slave4, Rx_slave5, Rx_slave6, Rx_slave7, Rx_slave8, Rx_slave9, Rx_slave10, Rx_slave11, Rx_slave12;
+  byte Rx_slave1, Rx_slave2, Rx_slave3, Rx_slave4, Rx_slave5, Rx_slave6, Rx_slave7, Rx_slave8, Rx_slave9, Rx_slave10, Rx_slave11, Rx_slave12, Rx_slave13;
   Rx_slave1 = Wire.read();
   Rx_slave2 = Wire.read();
   Rx_slave3 = Wire.read();
@@ -558,6 +596,7 @@ void LeerValoresSensados()
   Rx_slave10 = Wire.read();
   Rx_slave11 = Wire.read();
   Rx_slave12 = Wire.read();
+  Rx_slave13 = Wire.read();
 
   unsigned int aux_rx;
   aux_rx = (Rx_slave3 << 8) | Rx_slave4;      // Ajusta a parte fracionáia (depois da vírgula)
@@ -574,6 +613,8 @@ void LeerValoresSensados()
   LCD_Presion_PEEP = (float)(aux_rx * 0.0001); // Atribui a parte fracionária, depois da vírgula
   aux_rx = (Rx_slave9 << 8) | Rx_slave10;      // Ajusta a parte inteira (antes da vírgula)
   LCD_Presion_PEEP += aux_rx;                  // Atribui a parte iteir
+
+  AlarmaActual = Rx_slave13;
 
   //Serial.print("Presion PIP");
   //Serial.println(LCD_Presion_PIP);
@@ -598,7 +639,6 @@ void ImprimirErrorDeRango()
   lcd.clear();
 }
 
-
 // Modo de Funcionamiento  0- Modo Control por Volumen VCV, 1= Modo Control Presion de Soporte PSV  //
 void NewModo(int value)
 {
@@ -617,28 +657,26 @@ void NewModo(int value)
   case 1:
     lcd.print("PSV"); // Escribimos el Mensaje en el LCD.
     break;
-
   }
   lcd.setCursor(9, 1);
   lcd.print("SET:"); // Escribimos el Mensaje en el LCD.
   lcd.setCursor(13, 1);
   if (Modo_Seleccionado)
   {
-  lcd.print("PSV"); // Escribimos el Mensaje en el LCD.
+    lcd.print("PSV"); // Escribimos el Mensaje en el LCD.
   }
   else
   {
-  lcd.print("VCV"); // Escribimos el Mensaje en el LCD.
+    lcd.print("VCV"); // Escribimos el Mensaje en el LCD.
   }
 }
-
 
 void SetModo(int value)
 {
   Modo_Seleccionado = value;
-switch (Modo_Seleccionado)
-{
-    case 0:
+  switch (Modo_Seleccionado)
+  {
+  case 0:
     lcd.print("VCV"); // Escribimos el Mensaje en el LCD.
     break;
   case 1:
@@ -863,7 +901,7 @@ void NewPtrigger(int value)
   lcd.setCursor(4, 1);
   lcd.print(Valor_Actual_Pantalla); // Escribimos el Mensaje en el LCD.
   lcd.setCursor(9, 1);
-  lcd.print("SET:");              // Escribimos el Mensaje en el LCD.
+  lcd.print("SET:");                // Escribimos el Mensaje en el LCD.
   lcd.print(Ptrigger_Seleccionado); // Escribimos el Mensaje en el LCD.
 }
 
@@ -879,5 +917,41 @@ void SetPtrigger(int value)
   else
   {
     ImprimirErrorDeRango();
+  }
+}
+
+// Alarmas  ****************************************************************************************************************
+void ManejoAlarmas()
+{
+  switch (AlarmaActual) {
+    case ALARMA_PEEP:
+    case ALARMA_PIP:
+    case ALARMA_MECANICA:
+    digitalWrite(Led_ALarmas, HIGH);
+    break;
+    default:
+    break;
+  }
+}
+
+void MostrarAlarmaEnDisplay()
+{
+
+  lcd.setCursor(5, 0);
+  lcd.print("ALARMA"); // Escribimos el Mensaje en el LCD.
+  if (AlarmaActual == ALARMA_MECANICA)
+  {
+    lcd.setCursor(1, 1);
+    lcd.print("FALLA MECANICA"); // Escribimos el Mensaje en el LCD.
+  }
+  if (AlarmaActual == ALARMA_PEEP)
+  {
+    lcd.setCursor(1, 1);
+    lcd.print("P.MAX.EXCEDIDA"); // Escribimos el Mensaje en el LCD.
+  }
+  if (AlarmaActual == ALARMA_PIP)
+  {
+    lcd.setCursor(1, 1);
+    lcd.print("P.MAX.EXCEDIDA"); // Escribimos el Mensaje en el LCD.
   }
 }

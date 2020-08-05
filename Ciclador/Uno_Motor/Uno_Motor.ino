@@ -208,8 +208,12 @@ void loop()
     checkDelay();
 
     Posicion = myEncoder.read(); // read position
-                                 // Serial.print("Posicion:"); // print the position
+
+    // Serial.print("Posicion:"); // print the position
     //Serial.println(Posicion);
+
+    // Alarmas
+    manejoAlarmas();
 
     if (Modo_ON)
     {
@@ -257,11 +261,7 @@ void loop()
     else
     {
 
-        if (AlarmaActual == ALARMA_PIP)
-        {
-            AlarmaContinua();
-        }
-        else
+        if (AlarmaActual != ALARMA_PIP)
         {
             SilenciarAlarma();
 
@@ -285,7 +285,6 @@ void manejoCiclo()
     switch (CicloActual)
     {
     case INSPIRACION:
-
         digitalWrite(dirPin, HIGH);
         if (Pasos_Actuales < Pasos_Avance)
         {
@@ -368,6 +367,9 @@ void manejoAlarmas()
     case ALARMA_PEEP:
         AlarmaIntermitente();
         break;
+    case ALARMA_MECANICA:
+        AlarmaContinua();
+        break;
     case SIN_ALARMA:
         SilenciarAlarma();
         break;
@@ -437,7 +439,7 @@ void delayMillis(unsigned long time)
 //**********************************************************************************************************************************************//
 void receiveEvent(int cantBytes)
 { // Está código é executado quando "quantidade_bytes_esperados" foi recebido via I2C
-    byte byte1, byte2, byte3, byte4, byte5, byte6, byte7, byte8, byte9, byte10, byte11, byte12, byte13, byte14, byte15, byte16, byte17, byte18, byte19, byte20;
+    byte byte1, byte2, byte3, byte4, byte5, byte6, byte7, byte8, byte9, byte10, byte11, byte12, byte13, byte14, byte15, byte16, byte17, byte18, byte19, byte20, byte21;
 
     byte1 = Wire.read(); // Lê os 4 bytes enviados pelo mestre
     byte2 = Wire.read();
@@ -459,6 +461,7 @@ void receiveEvent(int cantBytes)
     byte18 = Wire.read();
     byte19 = Wire.read();
     byte20 = Wire.read();
+    byte21 = Wire.read();
 
     unsigned int aux;
     // Velocidad de Inspiracion
@@ -495,8 +498,6 @@ void receiveEvent(int cantBytes)
 
     //Inicio de Ciclo
     Modo_ON = (bool)byte17;
-    // if (Modo_ON)
-    AlarmaActual = SIN_ALARMA;
     // Serial.print("Modo");
     // Serial.println(Modo_ON);
 
@@ -520,6 +521,9 @@ void receiveEvent(int cantBytes)
       //  CalcularParametros();
     }
 
+    // Alarmas
+    AlarmaActual = byte21;
+
     // Serial.print("Modo:");
     // Serial.println(Modo_Seleccionado);
 }
@@ -528,7 +532,7 @@ void sendEvent()
 {
     //if (Presion_PIP != Presion_PIP_Anterior )
     // {
-    byte byte1, byte2, byte3, byte4, byte5, byte6, byte7, byte8, byte9, byte10, byte11, byte12;
+    byte byte1, byte2, byte3, byte4, byte5, byte6, byte7, byte8, byte9, byte10, byte11, byte12, byte13;
     unsigned int auxi;
 
     float Presion_PIP_Tx = Presion_PIP;
@@ -563,6 +567,9 @@ void sendEvent()
     auxi = (unsigned int)Presion_PEEP_Tx; // Pega somente o valor antes da vírgula
     byte12 = auxi;                        // byte2 = 0B00101110, pega apenas os primeros 8 bits
     byte11 = (auxi >> 8);                 // byte1 = 0B00100010, pega os 8 ultimos bits
+
+    // Informar el estado de las alarmas
+    byte13 = AlarmaActual;
 
     Wire.write(byte1);
     Wire.write(byte2);
