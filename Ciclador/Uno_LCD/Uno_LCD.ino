@@ -149,7 +149,7 @@ void loop()
   // Leer los valors desde el motor
   //**********************************************************************//
 
-  ObtenerValoresSensores();
+  //ObtenerValoresSensores();
 
   //**********************************************************************//
   // Si hay alarma la muestra en pantalla
