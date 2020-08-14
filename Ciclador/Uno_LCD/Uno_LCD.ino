@@ -20,9 +20,6 @@ Encoder myEnc(2, 4);
 // Pantalla
 LiquidCrystal_I2C lcd(0x27, 2, 1, 0, 4, 5, 6, 7); // Inicializa el LCD con DIR, E, RW, RS, D4, D5, D6, D7)
 
-// Led de Alarmas
-#define Led_ALarmas 12
-
 // Pulsador Pantalla
 #define Pulsador_Pantalla 5               // Seleccion de entrada para Pulsador navegar en pantallas
 int Pulsador_Pantalla_VALUE = 0;          // Variable que guarda el estado de la entrada
@@ -37,10 +34,6 @@ int Pulsador_Seleccion_Anterior_VALUE = 0; // Se guarda el valor anetrior para l
 #define Pulsador_Marcha 7
 int Pulsador_Marcha_VALUE = 0;
 int Pulsador_Marcha_VALUE_Anterior = 0;
-
-#define Pulsador_Modo 8
-int Pulsador_Modo_VALUE = 0;
-int Pulsador_Modo_VALUE_Anterior = 0;
 
 //Pulsador Modo Funcionamiento
 
@@ -108,8 +101,6 @@ void setup()
   pinMode(Pulsador_Seleccion, INPUT); //Le digo que el pin valor, 3 es una entrada digital
   pinMode(Pulsador_Marcha, INPUT);
 
-  pinMode(Led_ALarmas, OUTPUT);
-
   //attachInterrupt( 5, Pulsador_Marcha, RISING); //Defino interrupcion 5 Pin 18 para el pulsador de marcha
   attachInterrupt(1, Pulsador_Parada, CHANGE); //Defino interrupcion 6 Pin 19 para pulsador de parada
 }
@@ -155,16 +146,16 @@ void loop()
   Pulsador_Pantalla_Anterior_VALUE = Pulsador_Pantalla_VALUE;
 
   //**********************************************************************//
+  // Leer los valors desde el motor
+  //**********************************************************************//
+
+  ObtenerValoresSensores();
+
+  //**********************************************************************//
   // Si hay alarma la muestra en pantalla
   //**********************************************************************//
   if (AlarmaActual != SIN_ALARMA)
   {
-    if (Pulsador_Seleccion_VALUE == HIGH)
-    {
-      // Resetear la alarma
-      AlarmaActual = SIN_ALARMA;
-      digitalWrite(Led_ALarmas, LOW);
-    }
     ManejoAlarmas();
     MostrarAlarmaEnDisplay();
   }
@@ -271,11 +262,6 @@ void loop()
 
     case 7:
       // Lee los valores sensados solo si necesita mostrarlos en la pantalla
-      if (estaEnDelay())
-        break;
-
-      LeerValoresSensados();
-
       lcd.setCursor(0, 0);
       lcd.print("PIP:"); // Escribimos el Mensaje en el LCD.
       lcd.setCursor(4, 0);
@@ -290,9 +276,6 @@ void loop()
       lcd.print(LCD_Presion_PEEP); // Escribimos el Mensaje en el LCD.
       lcd.setCursor(9, 1);
       lcd.print("[cmH2O]"); // Escribimos el Mensaje en el LCD.
-
-      delayMillis(250);
-
       break;
 
     case 8:
@@ -380,10 +363,10 @@ void loop()
 
   //
 
-  if ((Velo_Inspiracion != Velo_Inspiracion_Anterior) || (Velo_Expiracion != Velo_Expiracion_Anterior) || (PMAX_Seleccionado != PMAX_Seleccionado_Anterior) || (PEEP_Seleccionado != PEEP_Seleccionado_Anterior) || (Vtidal_Seleccionado != Vtidal_Seleccionado_Anterior) || Cambio_Modo || Ptrigger_Seleccionado != Ptrigger_Seleccionado_Anterior || Modo_Seleccionado != Modo_Seleccionado_Anterior || AlarmaActual != SIN_ALARMA)
+  if ((Velo_Inspiracion != Velo_Inspiracion_Anterior) || (Velo_Expiracion != Velo_Expiracion_Anterior) || (PMAX_Seleccionado != PMAX_Seleccionado_Anterior) || (PEEP_Seleccionado != PEEP_Seleccionado_Anterior) || (Vtidal_Seleccionado != Vtidal_Seleccionado_Anterior) || Cambio_Modo || Ptrigger_Seleccionado != Ptrigger_Seleccionado_Anterior || Modo_Seleccionado != Modo_Seleccionado_Anterior)
   // (Pulsador_Marcha_VALUE == digitalRead(19))
   {
-    byte byte1, byte2, byte3, byte4, byte5, byte6, byte7, byte8, byte9, byte10, byte11, byte12, byte13, byte14, byte15, byte16, byte17, byte18, byte19, byte20, byte21;
+    byte byte1, byte2, byte3, byte4, byte5, byte6, byte7, byte8, byte9, byte10, byte11, byte12, byte13, byte14, byte15, byte16, byte17, byte18, byte19, byte20;
     unsigned int aux;
 
     // Se envia Velocidad de Inspiracion
@@ -447,9 +430,6 @@ void loop()
     //Envio el Modo de funcionamiento 0=VCV y 1=PSC
     byte20 = Modo_Seleccionado;
 
-    //Envio el estado de las Alarmas
-    byte21 = AlarmaActual;
-
     //Inicia transmision de Bytes
     Wire.beginTransmission(4); // Começa transmissão para o escravo 0x2C
     Wire.write(byte1);         // Envia os bytes do número antes da vírgua e depois da vírgula
@@ -472,7 +452,6 @@ void loop()
     Wire.write(byte18);
     Wire.write(byte19);
     Wire.write(byte20);
-    Wire.write(byte21);
     Wire.endTransmission(); // Termina a transmissão
   }
 
@@ -582,6 +561,14 @@ void Pulsador_Parada()
 //****************************************************************************************************************
 // Leer los valores sensados
 //****************************************************************************************************************
+
+void ObtenerValoresSensores()
+{
+  if (estaEnDelay())
+    return;
+  LeerValoresSensados();
+  delayMillis(250);
+}
 
 void LeerValoresSensados()
 {
@@ -926,20 +913,22 @@ void SetPtrigger(int value)
 // Alarmas  ****************************************************************************************************************
 void ManejoAlarmas()
 {
-  switch (AlarmaActual) {
-    case ALARMA_PEEP:
-    case ALARMA_PIP:
-    case ALARMA_MECANICA:
-    case PACIENTE_DESCONECTADO:
-    digitalWrite(Led_ALarmas, HIGH);
+  switch (AlarmaActual)
+  {
+  case ALARMA_PEEP:
+  case ALARMA_PIP:
+  case ALARMA_MECANICA:
+  case PACIENTE_DESCONECTADO:
     break;
-    default:
+  default:
     break;
   }
 }
 
+bool _AuxMostrarAlarma = false;
 void MostrarAlarmaEnDisplay()
 {
+  lcd.clear();
 
   lcd.setCursor(5, 0);
   lcd.print("ALARMA"); // Escribimos el Mensaje en el LCD.
@@ -958,7 +947,7 @@ void MostrarAlarmaEnDisplay()
     lcd.setCursor(1, 1);
     lcd.print("P.MAX.EXCEDIDA"); // Escribimos el Mensaje en el LCD.
   }
-    if (AlarmaActual == PACIENTE_DESCONECTADO)
+  if (AlarmaActual == PACIENTE_DESCONECTADO)
   {
     lcd.setCursor(0, 1);
     lcd.print("PAC.DESCONECTADO"); // Escribimos el Mensaje en el LCD.

@@ -67,7 +67,7 @@ AccelStepper stepper = AccelStepper(motorInterfaceType, stepPin, dirPin);
 int Pulsador_Reset_VALUE = 0;
 
 // Alarmas
-#define Pmin_Paciente_Desconectado 3        // Setea la presion minima para disparar alarma de paciente desconectado
+#define Pmin_Paciente_Desconectado 5 // Setea la presion minima para disparar alarma de paciente desconectado
 #define Buzzer_Pin 5
 #define Tono_Alarma 800
 #define Tiempo_Alarma 1000
@@ -230,35 +230,35 @@ void loop()
 
         if ((ModoActual != ModoSeleccionado) && (Pasos_Actuales == 0))
         {
-          ModoActual = ModoSeleccionado;
-          CalcularParametros();
-          if(ModoActual==PSV)
-          {
-           delayMillis(PsvTiempoEspera * 1000);
-          }
+            ModoActual = ModoSeleccionado;
+            CalcularParametros();
+            if (ModoActual == PSV)
+            {
+                delayMillis(PsvTiempoEspera * 1000);
+            }
         }
-        
+
         // Alarmas
         manejoAlarmas();
 
         // Graficos
         manejoGraficos();
 
-         if (ModoActual == PSV && estaEnDelay() && Pasos_Actuales == 0 && CicloActual == INSPIRACION)
-         { // Modo Control Presion de Soporte PSV
-             if (ChequeoSoporteVolumenPresion())
-             {
-              //   CalcularParametros();
-                 cancelarDelay(); // corta el delay de expera entre los ciclo en el modo PSV
-             }
-             if (ModoSeleccionado != ModoActual && estaEnDelay()) // Cambia de modo de funcionamiento mientras esta en el intervalo de espera
+        if (ModoActual == PSV && estaEnDelay() && Pasos_Actuales == 0 && CicloActual == INSPIRACION)
+        { // Modo Control Presion de Soporte PSV
+            if (ChequeoSoporteVolumenPresion())
+            {
+                //   CalcularParametros();
+                cancelarDelay(); // corta el delay de expera entre los ciclo en el modo PSV
+            }
+            if (ModoSeleccionado != ModoActual && estaEnDelay()) // Cambia de modo de funcionamiento mientras esta en el intervalo de espera
             {
                 ModoActual = ModoSeleccionado;
                 CalcularParametros();
                 cancelarDelay();
             }
-         }
-   
+        }
+
         // Ciclo de funcionamiento
         manejoCiclo();
     }
@@ -352,7 +352,7 @@ void manejoCiclo()
             }
 
             // Calcula los parametro para el siguiente ciclo
-            
+
             delayMillis(1000);
         }
         break;
@@ -363,6 +363,10 @@ void manejoCiclo()
 
 void manejoAlarmas()
 {
+    if (digitalRead(Pulsador_Reset) == HIGH) {
+        SilenciarAlarma();
+    }
+
     switch (AlarmaActual)
     {
     case ALARMA_PIP: // No debería entrar en esta opcion pero por las dudas se contempla
@@ -427,7 +431,7 @@ void checkDelay()
 
     if ((unsigned long)millis() - Aux_Delay_Begin >= Aux_Delay_Time)
     {
-    cancelarDelay();
+        cancelarDelay();
     }
 }
 
@@ -524,8 +528,6 @@ void receiveEvent(int cantBytes)
     else
     {
         ModoSeleccionado = PSV;
-      //  delayMillis(PsvTiempoEspera * 1000);
-      //  CalcularParametros();
     }
 
     // Alarmas
@@ -677,18 +679,20 @@ bool ChequeoPEEP()
         AlarmaActual = ALARMA_PEEP;
         return true;
     }
-    return false;
+    return ChequeoPacienteDesconectado(Presion_PEEP);
 }
 
 bool ChequeoSoporteVolumenPresion()
 {
-   return (Presion() < (float)PTrigger);
+    return (Presion() < (float)PTrigger);
 }
 
 bool ChequeoPacienteDesconectado(double presion)
 {
-    if (presion < Pmin_Paciente_Desconectado) {
+    if (presion < Pmin_Paciente_Desconectado)
+    {
         AlarmaActual = PACIENTE_DESCONECTADO;
+        InformarAlarma(PACIENTE_DESCONECTADO);
         return true;
     }
     return false;
@@ -853,12 +857,12 @@ void InformarAlarma(TipoDeAlarma alarma)
     switch (alarma)
     {
     case ALARMA_PEEP:
-        break;
     case ALARMA_PIP:
-        break;
     case ALARMA_MECANICA:
+        digitalWrite(Led_Falla, HIGH);
         break;
     case SIN_ALARMA:
+        digitalWrite(Led_Falla, LOW);
         break;
     default:
         break;
