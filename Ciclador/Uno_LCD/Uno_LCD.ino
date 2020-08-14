@@ -9,6 +9,7 @@ typedef enum TipoDeAlarma
   ALARMA_PIP,
   ALARMA_PEEP,
   ALARMA_MECANICA,
+  PACIENTE_DESCONECTADO,
   SIN_ALARMA
 };
 TipoDeAlarma AlarmaActual = SIN_ALARMA;
@@ -354,6 +355,7 @@ void loop()
   //*******************************************************************************************************************************
   // Toma lecturas de corriente bobinas del motor (Hacer una interrupcion para medir la corriente cada 1 seg)
   //*********************************************************************************************************************************
+  /*
   if ((unsigned long)millis() - Aux_Delay_Lectura_Sensor_Corriente >= Intervalo_Lectura_Sensor_Corriente)
   {
     IntensidadPico_A = Corriente_Sensor_A(); //Funcion para llamar a la lectura de corriente en la Bobina A del motor paso a paso.
@@ -368,6 +370,7 @@ void loop()
       }
     }
   }
+  */
 
   //************************************************************************************************************************//
   // Comunicacion I2c entre Mega (Maestro) y Uno (Esclavo)                                                                  //
@@ -927,6 +930,7 @@ void ManejoAlarmas()
     case ALARMA_PEEP:
     case ALARMA_PIP:
     case ALARMA_MECANICA:
+    case PACIENTE_DESCONECTADO:
     digitalWrite(Led_ALarmas, HIGH);
     break;
     default:
@@ -953,5 +957,10 @@ void MostrarAlarmaEnDisplay()
   {
     lcd.setCursor(1, 1);
     lcd.print("P.MAX.EXCEDIDA"); // Escribimos el Mensaje en el LCD.
+  }
+    if (AlarmaActual == PACIENTE_DESCONECTADO)
+  {
+    lcd.setCursor(0, 1);
+    lcd.print("PAC.DESCONECTADO"); // Escribimos el Mensaje en el LCD.
   }
 }

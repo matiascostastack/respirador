@@ -7,7 +7,8 @@
 typedef enum ModoOperacion
 {
     VCV,
-    PSV
+    PSV,
+    NIL
 };
 
 typedef enum TipoDeCiclo
@@ -22,6 +23,7 @@ typedef enum TipoDeAlarma
     ALARMA_PIP,
     ALARMA_PEEP,
     ALARMA_MECANICA,
+    PACIENTE_DESCONECTADO,
     SIN_ALARMA
 };
 
@@ -65,6 +67,7 @@ AccelStepper stepper = AccelStepper(motorInterfaceType, stepPin, dirPin);
 int Pulsador_Reset_VALUE = 0;
 
 // Alarmas
+#define Pmin_Paciente_Desconectado 3        // Setea la presion minima para disparar alarma de paciente desconectado
 #define Buzzer_Pin 5
 #define Tono_Alarma 800
 #define Tiempo_Alarma 1000
@@ -205,7 +208,6 @@ void setup()
 
 void loop()
 {
-    checkDelay();
 
     Posicion = myEncoder.read(); // read position
 
@@ -217,6 +219,8 @@ void loop()
 
     if (Modo_ON)
     {
+        checkDelay();
+
         digitalWrite(Led_Marcha, HIGH);
 
         if (Pasos_Avance == 0)
@@ -268,6 +272,7 @@ void loop()
             if (digitalRead(Led_Marcha) == HIGH)
                 IrAlInicio();
 
+            ModoActual = NIL;
             digitalWrite(Led_Marcha, LOW);
         }
     }
@@ -369,6 +374,8 @@ void manejoAlarmas()
         break;
     case ALARMA_MECANICA:
         AlarmaContinua();
+        break;
+    case PACIENTE_DESCONECTADO:
         break;
     case SIN_ALARMA:
         SilenciarAlarma();
@@ -676,6 +683,15 @@ bool ChequeoPEEP()
 bool ChequeoSoporteVolumenPresion()
 {
    return (Presion() < (float)PTrigger);
+}
+
+bool ChequeoPacienteDesconectado(double presion)
+{
+    if (presion < Pmin_Paciente_Desconectado) {
+        AlarmaActual = PACIENTE_DESCONECTADO;
+        return true;
+    }
+    return false;
 }
 
 //**********************************************************************************************************************************************//
