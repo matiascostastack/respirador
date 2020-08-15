@@ -149,7 +149,7 @@ void loop()
   // Leer los valors desde el motor
   //**********************************************************************//
 
-  //ObtenerValoresSensores();
+  ObtenerValoresSensores();
 
   //**********************************************************************//
   // Si hay alarma la muestra en pantalla
@@ -262,6 +262,7 @@ void loop()
 
     case 7:
       // Lee los valores sensados solo si necesita mostrarlos en la pantalla
+
       lcd.setCursor(0, 0);
       lcd.print("PIP:"); // Escribimos el Mensaje en el LCD.
       lcd.setCursor(4, 0);
@@ -512,6 +513,13 @@ volatile bool Aux_En_Delay = false;
 unsigned long Aux_Delay_Time = 0;
 unsigned long Aux_Delay_Begin = 0;
 
+void cancelarDelay()
+{
+  Aux_En_Delay = false;
+  Aux_Delay_Time = 0;
+  Aux_Delay_Begin = 0;
+}
+
 bool estaEnDelay()
 {
   return Aux_En_Delay;
@@ -524,9 +532,7 @@ void checkDelay()
 
   if ((unsigned long)millis() - Aux_Delay_Begin >= Aux_Delay_Time)
   {
-    Aux_En_Delay = false;
-    Aux_Delay_Time = 0;
-    Aux_Delay_Begin = 0;
+    cancelarDelay();
   }
 }
 
@@ -572,7 +578,7 @@ void ObtenerValoresSensores()
 
 void LeerValoresSensados()
 {
-  Wire.requestFrom(4, 12); //4,4 significa nodo 4, 4 bytes
+  Wire.requestFrom(4, 13); //4,4 significa nodo 4, 4 bytes
   byte Rx_slave1, Rx_slave2, Rx_slave3, Rx_slave4, Rx_slave5, Rx_slave6, Rx_slave7, Rx_slave8, Rx_slave9, Rx_slave10, Rx_slave11, Rx_slave12, Rx_slave13;
   Rx_slave1 = Wire.read();
   Rx_slave2 = Wire.read();
@@ -604,7 +610,8 @@ void LeerValoresSensados()
   aux_rx = (Rx_slave9 << 8) | Rx_slave10;      // Ajusta a parte inteira (antes da vírgula)
   LCD_Presion_PEEP += aux_rx;                  // Atribui a parte iteir
 
-  AlarmaActual = Rx_slave13;
+  char codigoAlarma = Rx_slave13;
+  AlarmaActual = ObtenerAlarmaDesdeCodigo(codigoAlarma);
 
   //Serial.print("Presion PIP");
   //Serial.println(LCD_Presion_PIP);
@@ -882,6 +889,8 @@ void NewPtrigger(int value)
 
   Valor_Actual_Pantalla += value;
 
+  lcd.clear();
+
   lcd.setCursor(0, 0);
   lcd.print("Trig[" + String(triggerMinValue) + "-" + triggerMaxValue + "cmH2O]"); // Escribimos el Mensaje en el LCD.
   lcd.setCursor(0, 1);
@@ -940,7 +949,7 @@ void MostrarAlarmaEnDisplay()
   if (AlarmaActual == ALARMA_PEEP)
   {
     lcd.setCursor(1, 1);
-    lcd.print("P.MAX.EXCEDIDA"); // Escribimos el Mensaje en el LCD.
+    lcd.print("P.MIN.EXCEDIDA"); // Escribimos el Mensaje en el LCD.
   }
   if (AlarmaActual == ALARMA_PIP)
   {
@@ -951,5 +960,22 @@ void MostrarAlarmaEnDisplay()
   {
     lcd.setCursor(0, 1);
     lcd.print("PAC.DESCONECTADO"); // Escribimos el Mensaje en el LCD.
+  }
+}
+
+TipoDeAlarma ObtenerAlarmaDesdeCodigo(char codigo)
+{
+  switch (codigo)
+  {
+  case 0:
+    return SIN_ALARMA;
+  case 1:
+    return ALARMA_PEEP;
+  case 2:
+    return ALARMA_PIP;
+  case 3:
+    return ALARMA_MECANICA;
+  case 4:
+    return PACIENTE_DESCONECTADO;
   }
 }

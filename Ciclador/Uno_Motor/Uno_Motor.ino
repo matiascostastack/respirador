@@ -246,7 +246,7 @@ void loop()
 
         if (ModoActual == PSV && estaEnDelay() && Pasos_Actuales == 0 && CicloActual == INSPIRACION)
         { // Modo Control Presion de Soporte PSV
-            if (ChequeoSoporteVolumenPresion())
+            if (ChequeoSoportePresion())
             {
                 //   CalcularParametros();
                 cancelarDelay(); // corta el delay de expera entre los ciclo en el modo PSV
@@ -317,7 +317,7 @@ void manejoCiclo()
             Serial.println((millis() - Aux_Tiempo_Ciclo) / 1000.0);
             Aux_Tiempo_Ciclo = millis();
 
-            delayMillis(1000);
+            //delayMillis(1000);
         }
         break;
     case EXPIRACION:
@@ -363,8 +363,9 @@ void manejoCiclo()
 
 void manejoAlarmas()
 {
-    if (digitalRead(Pulsador_Reset) == HIGH) {
-        SilenciarAlarma();
+    if (digitalRead(Pulsador_Reset) == HIGH)
+    {
+        AlarmaActual = SIN_ALARMA;
     }
 
     switch (AlarmaActual)
@@ -372,17 +373,23 @@ void manejoAlarmas()
     case ALARMA_PIP: // No debería entrar en esta opcion pero por las dudas se contempla
         AlarmaContinua();
         Modo_ON = false;
+        digitalWrite(Led_Falla, HIGH);
         break;
     case ALARMA_PEEP:
         AlarmaIntermitente();
+        digitalWrite(Led_Falla, HIGH);
         break;
     case ALARMA_MECANICA:
         AlarmaContinua();
+        digitalWrite(Led_Falla, HIGH);
         break;
     case PACIENTE_DESCONECTADO:
+        AlarmaIntermitente();
+        digitalWrite(Led_Falla, HIGH);
         break;
     case SIN_ALARMA:
         SilenciarAlarma();
+        digitalWrite(Led_Falla, LOW);
         break;
     default:
         break;
@@ -578,7 +585,7 @@ void sendEvent()
     byte11 = (auxi >> 8);                 // byte1 = 0B00100010, pega os 8 ultimos bits
 
     // Informar el estado de las alarmas
-    byte13 = AlarmaActual;
+    byte13 = ObtenerCodigoDeAlarma(AlarmaActual);
 
     Wire.write(byte1);
     Wire.write(byte2);
@@ -592,6 +599,7 @@ void sendEvent()
     Wire.write(byte10);
     Wire.write(byte11);
     Wire.write(byte12);
+    Wire.write(byte13);
 
     // }
 
@@ -666,23 +674,23 @@ bool ChequeoPIP()
         Modo_ON = false;
         return true;
     }
+    ChequeoPacienteDesconectado(Presion_PIP);
     return false;
 }
 
 bool ChequeoPEEP()
 {
     Presion_PEEP = Presion();
-    if (Presion_PIP > PMAX)
+    if (Presion_PEEP < PEEP)
     {
         InformarAlarma(ALARMA_PEEP);
-        IrAlInicio();
         AlarmaActual = ALARMA_PEEP;
         return true;
     }
-    return ChequeoPacienteDesconectado(Presion_PEEP);
+    return false;
 }
 
-bool ChequeoSoporteVolumenPresion()
+bool ChequeoSoportePresion()
 {
     return (Presion() < (float)PTrigger);
 }
@@ -851,6 +859,25 @@ void SilenciarAlarma()
     analogWrite(Buzzer_Pin, 0);
 }
 
+char ObtenerCodigoDeAlarma(TipoDeAlarma alarma)
+{
+    switch (alarma)
+    {
+    case SIN_ALARMA:
+        return 0;
+    case ALARMA_PEEP:
+        return 1;
+    case ALARMA_PIP:
+        return 2;
+    case ALARMA_MECANICA:
+        return 3;
+    case PACIENTE_DESCONECTADO:
+        return 4;
+    default:
+        return -1;
+    }
+}
+
 void InformarAlarma(TipoDeAlarma alarma)
 {
     // Comunicar al controlador de pantalla el tipo de alarma
@@ -859,10 +886,9 @@ void InformarAlarma(TipoDeAlarma alarma)
     case ALARMA_PEEP:
     case ALARMA_PIP:
     case ALARMA_MECANICA:
-        digitalWrite(Led_Falla, HIGH);
+    case PACIENTE_DESCONECTADO:
         break;
     case SIN_ALARMA:
-        digitalWrite(Led_Falla, LOW);
         break;
     default:
         break;
