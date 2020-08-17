@@ -51,8 +51,8 @@ int PEEP_Seleccionado_Anterior = 5;
 int Vtidal_Seleccionado = 40; //(En porcentaje. 40 %. Caudal total del ambu 1500ml)
 int Vtidal_Seleccionado_Anterior = 40;
 int Vtidal_Seleccionado_LCD = 700; //500ml
-int Ptrigger_Seleccionado = -5;
-int Ptrigger_Seleccionado_Anterior = -5;
+int Ptrigger_Seleccionado = -3;
+int Ptrigger_Seleccionado_Anterior = -3;
 
 float Tciclo = 0.0;
 float Tinspiracion = 0.0;
@@ -878,7 +878,7 @@ void SetVtidal(int value)
 }
 
 // Presion Trigger Modo Soporte de Presión  ****************************************************************************************************************
-#define triggerMinValue -10
+#define triggerMinValue -3
 #define triggerMaxValue 0
 void NewPtrigger(int value)
 {
@@ -889,7 +889,7 @@ void NewPtrigger(int value)
 
   Valor_Actual_Pantalla += value;
 
-  lcd.clear();
+ // lcd.clear();
 
   lcd.setCursor(0, 0);
   lcd.print("Trig[" + String(triggerMinValue) + "-" + triggerMaxValue + "cmH2O]"); // Escribimos el Mensaje en el LCD.
@@ -937,7 +937,7 @@ void ManejoAlarmas()
 bool _AuxMostrarAlarma = false;
 void MostrarAlarmaEnDisplay()
 {
-  lcd.clear();
+  //lcd.clear();
 
   lcd.setCursor(5, 0);
   lcd.print("ALARMA"); // Escribimos el Mensaje en el LCD.
@@ -949,7 +949,7 @@ void MostrarAlarmaEnDisplay()
   if (AlarmaActual == ALARMA_PEEP)
   {
     lcd.setCursor(1, 1);
-    lcd.print("P.MIN.EXCEDIDA"); // Escribimos el Mensaje en el LCD.
+    lcd.print("P.INFERIOR.PEEP"); // Escribimos el Mensaje en el LCD.
   }
   if (AlarmaActual == ALARMA_PIP)
   {
@@ -961,6 +961,8 @@ void MostrarAlarmaEnDisplay()
     lcd.setCursor(0, 1);
     lcd.print("PAC.DESCONECTADO"); // Escribimos el Mensaje en el LCD.
   }
+  delay(100);
+  lcd.clear();
 }
 
 TipoDeAlarma ObtenerAlarmaDesdeCodigo(char codigo)

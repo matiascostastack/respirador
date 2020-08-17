@@ -71,8 +71,10 @@ int Pulsador_Reset_VALUE = 0;
 #define Buzzer_Pin 5
 #define Tono_Alarma 800
 #define Tiempo_Alarma 1000
+#define Tiempo_Reset 30000 // Tiempo entre el reset de una alarma y un nuevo disparo
 bool Alarma_ON = false;
 unsigned long Tiempo_Alarma_Transcurrido = 0;
+unsigned long Tiempo_Reset_Transcurrido = 0;
 
 // Seteos de valores de la relacion y configuracion del sistema. Al variarlos aqui variaran uniformamente en la logica
 float Angulo_Brazos = 0;
@@ -239,7 +241,7 @@ void loop()
         }
 
         // Alarmas
-        manejoAlarmas();
+        //manejoAlarmas();
 
         // Graficos
         manejoGraficos();
@@ -366,6 +368,7 @@ void manejoAlarmas()
     if (digitalRead(Pulsador_Reset) == HIGH)
     {
         AlarmaActual = SIN_ALARMA;
+        Tiempo_Reset_Transcurrido = millis();
     }
 
     switch (AlarmaActual)
@@ -669,7 +672,7 @@ bool ChequeoPIP()
     if (Presion_PIP > PMAX)
     {
         InformarAlarma(ALARMA_PIP);
-        AlarmaActual = ALARMA_PIP;
+        SetearAlarmaActual(ALARMA_PIP);
         IrAlInicio();
         Modo_ON = false;
         return true;
@@ -684,7 +687,7 @@ bool ChequeoPEEP()
     if (Presion_PEEP < PEEP)
     {
         InformarAlarma(ALARMA_PEEP);
-        AlarmaActual = ALARMA_PEEP;
+        SetearAlarmaActual(ALARMA_PEEP);
         return true;
     }
     return false;
@@ -699,7 +702,7 @@ bool ChequeoPacienteDesconectado(double presion)
 {
     if (presion < Pmin_Paciente_Desconectado)
     {
-        AlarmaActual = PACIENTE_DESCONECTADO;
+        SetearAlarmaActual(PACIENTE_DESCONECTADO);
         InformarAlarma(PACIENTE_DESCONECTADO);
         return true;
     }
@@ -831,6 +834,14 @@ void IrAlInicio()
 //**********************************************************************************************************************************************//
 // Alarmas
 //**********************************************************************************************************************************************//
+void SetearAlarmaActual(TipoDeAlarma alarma)
+{
+    if ((unsigned long)millis() - Tiempo_Reset_Transcurrido > Tiempo_Reset)
+    {
+        AlarmaActual = alarma;
+    }
+}
+
 void AlarmaIntermitente()
 {
     if ((unsigned long)millis() - Tiempo_Alarma_Transcurrido > 1000)
